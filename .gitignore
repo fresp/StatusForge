@@ -1,0 +1,93 @@
+# Dependencies and packages
+node_modules/
+*.tgz
+*.tar.gz
+*.zip
+
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+*.mod
+*.sum
+.vscode
+.go
+
+# Build artifacts
+bin/
+tmp/
+build/
+dist/
+
+# Environment specific
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+
+# Coverage directory used by tools like istanbul
+cov/
+
+# Testing results
+coverage/
+
+# OS generated files
+ehthumbs.db
+Thumbs.db
+
+# Local development environment
+.env.production
+.env.local
+.env.staging
+.env.backup
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Temporary folders
+temp/
+tmp/
+
+# Frontend builds
+frontend/dist/
+frontend/build/
+
+# Backend binaries
+api/bin/
+apps/*/bin/
+
+# Database files
+*.db
+*.db-journal
+
+# Secrets and sensitive files
+credentials.json
+credentials/
+*.pem
+*.key
+id_rsa*
+
+
+apps/web/node_modules/
