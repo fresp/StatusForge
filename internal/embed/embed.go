@@ -2,5 +2,5 @@ package embed
 
 import "embed"
 
-//go:embed apps/web/dist/*
+//go:embed all:web/dist
 var Assets embed.FS

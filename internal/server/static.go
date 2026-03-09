@@ -12,7 +12,7 @@ import (
 
 // StaticFileServer serves static files from embedded FS
 func StaticFileServer() gin.HandlerFunc {
-	fSys, err := fs.Sub(embed.Assets, "apps/web/dist")
+	fSys, err := fs.Sub(embed.Assets, "web/dist")
 	if err != nil {
 		log.Printf("[STATIC] Error creating sub filesystem: %v", err)
 		return func(c *gin.Context) {
