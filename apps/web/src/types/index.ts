@@ -82,15 +82,6 @@ export interface Monitor {
   subComponentId?: string
   createdAt: string
 }
-  id: string
-  name: string
-  type: MonitorType
-  target: string
-  intervalSeconds: number
-  timeoutSeconds: number
-  componentId: string
-  createdAt: string
-}
 
 export interface MonitorLog {
   id: string

@@ -1,78 +1,71 @@
 version: "3.9"
 
 services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: status-forge-unified
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ENABLE_WORKER: ${ENABLE_WORKER:-true}
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB_NAME: statusplatform
+      REDIS_ADDR: redis:6379
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - statusplatform
+    # Only add the NET_RAW cap if monitoring is enabled 
+    cap_add:
+      - NET_RAW  # Needed for ICMP ping monitoring tests
+
+  mongo:
+    image: mongo:7
+    container_name: status-forge-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: strongpassword
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - statusplatform
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: statuspage-redis
+    container_name: status-forge-redis
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
     networks:
-      - statuspage
+      - statusplatform
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
 
-  api:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.api
-    container_name: statuspage-api
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      MONGO_URI: mongodb://root:strongpassword@host.docker.internal:27017/admin?authSource=admin
-      MONGO_DB_NAME: statusplatform
-      REDIS_ADDR: redis:6379
-    ports:
-      - "8080:8080"
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - statuspage
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  worker:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.worker
-    container_name: statuspage-worker
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      MONGO_URI: mongodb://root:strongpassword@host.docker.internal:27017/admin?authSource=admin
-      REDIS_ADDR: redis:6379
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - statuspage
-    cap_add:
-      - NET_RAW
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.web
-    container_name: statuspage-web
-    restart: unless-stopped
-    ports:
-      - "3000:80"
-    depends_on:
-      - api
-    networks:
-      - statuspage
-
 volumes:
+  mongo_data:
   redis_data:
 
 networks:
-  statuspage:
+  statusplatform:
     driver: bridge

@@ -1,0 +1,57 @@
+# Dependencies
+
+
+
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+*.o
+
+# Logs
+*.log
+logs/
+
+# IDE artifacts  
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git stuff
+.git/
+.gitignore
+
+# Environment
+.env
+
+# Node_modules scattered throughout - though most should be in /web
+node_modules/
+
+# Temporary files
+tmp/
+temp/
+.DS_Store
+Thumbs.db
+
+# Test outputs
+coverage/
+test-results/
+
+# SCM
+.svn/
+.hg/
+
+# Local config overrides
+config.local.*
+
+# Built assets - we'll include the necessary dist folder in Docker build
+apps/web/build/
+!apps/web/dist/**
+
+# Sisyphus artifacts
+.sisyphus/

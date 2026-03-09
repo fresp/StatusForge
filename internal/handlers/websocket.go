@@ -69,7 +69,11 @@ func (c *Client) readPump() {
 	}()
 	c.conn.SetReadLimit(512)
 	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	c.conn.SetPongHandler(func(string) error {
+	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		c.conn.SetPongHandler(func(string) error {
+			log.Print("[WS] Ping received")
+			c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			return nil
 		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
@@ -116,7 +120,7 @@ func ServeWs(hub *Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			log.Printf("WebSocket upgrade error: %v", err)
+			log.Printf("[WS] WebSocket upgrade error: %v", err)
 			return
 		}
 		client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
@@ -135,12 +139,12 @@ func BroadcastEvent(hub *Hub, eventType string, data interface{}) {
 	event := WSEvent{Type: eventType, Data: data}
 	msg, err := jsonMarshal(event)
 	if err != nil {
-		log.Printf("BroadcastEvent marshal error: %v", err)
+		log.Printf("[WS] BroadcastEvent marshal error: %v", err)
 		return
 	}
 	select {
 	case hub.broadcast <- msg:
 	default:
-		log.Println("BroadcastEvent: channel full, dropping message")
+		log.Println("[WS] BroadcastEvent: channel full, dropping message")
 	}
 }

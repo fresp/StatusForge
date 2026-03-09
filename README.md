@@ -1,6 +1,8 @@
-# Status Platform
+# StatusForge
 
 A production-ready, self-hosted status page and monitoring platform — similar to Atlassian Statuspage, BetterStack, and UptimeRobot. Single-tenant, fully open-source.
+
+This unified server combines API, Worker, and embeds Web frontend in a single binary using goroutines.
 
 ![Status Platform](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go) ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react) ![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb) ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
 
@@ -15,40 +17,29 @@ A production-ready, self-hosted status page and monitoring platform — similar 
 - **Email Subscribers** — Collect and manage subscriber emails for status notifications
 - **JWT Authentication** — Secure admin-only routes with bcrypt password hashing
 - **90-Day Uptime History** — Daily uptime aggregation with color-coded bars per component
-- **Docker Compose** — One-command deployment
+- **Single Container Deployment** — Unified binary in a single Docker container
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Backend API | Go 1.21, Gin, JWT, bcrypt |
-| Monitoring Worker | Go, goroutines, ICMP/TCP/DNS/HTTP |
-| Frontend | React 18, Vite, TypeScript, Tailwind CSS |
-| Charts | Recharts |
+| Monitoring Worker | Go, goroutines, ICMP/TCP/DNS/HTTP with graceful shutdown |
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS (embedded in Go binary) |
 | Database | MongoDB 7 |
 | Cache / Pub-Sub | Redis |
 | Real-time | WebSocket (gorilla/websocket) |
-| Deployment | Docker Compose |
+| Deployment | Single Docker Image |
 
-## Project Structure
+## Architecture
 
-```
-status-platform/
-├── apps/
-│   ├── api/           # Gin HTTP API server
-│   ├── worker/        # Background monitoring worker
-│   └── web/           # React + Vite frontend
-├── internal/
-│   ├── database/      # MongoDB + Redis connection helpers
-│   ├── handlers/      # HTTP handlers (auth, components, incidents, etc.)
-│   ├── middleware/     # JWT auth middleware
-│   └── models/        # MongoDB document models
-├── configs/           # Config loader (env vars)
-├── docker/            # Dockerfiles for api, worker, web
-├── scripts/           # seed.go — seed sample data
-├── docker-compose.yml
-└── .env.example
-```
+This implementation consolidates the previous 3 separate services (API, Worker, Web) into a single binary:
+
+- **Unified Server** (`cmd/server/main.go`) - runs all services concurrently in goroutines
+- **Embedded Frontend** - React frontend statically embedded in the Go binary
+- **Toggleable Worker** - Enable/disable via `ENABLE_WORKER` environment variable
+- **Health Check** - `/health` endpoint with database connectivity verification
+- **Graceful Shutdown** - 30s timeout with proper goroutine cleanup
 
 ## Quick Start
 
@@ -56,26 +47,21 @@ status-platform/
 
 - Docker and Docker Compose
 
-### 1. Clone and configure
+### 1. Prepare your configuration
 
 ```bash
-git clone <repo-url>
-cd status-platform
-
 cp .env.example .env
-# Edit .env if you want to change defaults (optional for local dev)
+# Edit .env if you want to change defaults
 ```
 
-### 2. Start all services
+### 2. Run the unified platform
 
 ```bash
 docker compose up --build
 ```
 
 This starts:
-- **API** on port `8080`
-- **Worker** (monitoring daemon, no HTTP port)
-- **Web** on port `3000`
+- **Server** on port `8080` - serves API, WebSocket, and embedded Web frontend
 - **MongoDB** on port `27017`
 - **Redis** on port `6379`
 
@@ -92,8 +78,8 @@ This creates sample components, subcomponents, and a resolved incident with full
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:3000 | Public status page |
-| http://localhost:3000/admin/login | Admin login |
+| http://localhost:8080 | Public status page (served from embedded frontend) |
+| http://localhost:8080/admin/login | Admin login |
 | http://localhost:8080/api | API base |
 
 **Default admin credentials:**
@@ -104,142 +90,23 @@ Password: admin123
 
 > Change these in `.env` before deploying to production.
 
-## Environment Variables
+## Configuration Options
 
-Copy `.env.example` to `.env` and configure:
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `ENABLE_WORKER` | Whether to run the monitoring worker | `true` |
+| `PORT` | Server listening port | `8080` |
+| `MONGO_URI` | MongoDB connection string | `mongodb://mongo:27017` |
+| `MONGO_DB_NAME` | Database name | `statusplatform` |
+| `REDIS_ADDR` | Redis connection address | `redis:6379` | 
+| `JWT_SECRET` | Secret for JWT generation | `change-me-in-production` |
 
-```env
-# MongoDB
-MONGO_URI=mongodb://mongo:27017
-MONGO_DB_NAME=statusplatform
+## Health Check
 
-# Redis
-REDIS_ADDR=redis:6379
+The server exposes a health check endpoint to verify database connectivity:
 
-# API
-PORT=8080
-JWT_SECRET=change-me-in-production
-
-# Default admin account (created on first startup)
-ADMIN_EMAIL=admin@statusplatform.com
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
-```
-
-## API Endpoints
-
-### Public (no auth required)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/status/summary` | Overall system status |
-| GET | `/api/status/components` | All components with subcomponents |
-| GET | `/api/status/incidents` | Active and recent incidents |
-| POST | `/api/subscribe` | Subscribe an email for notifications |
-
-### Admin (JWT required)
-
-#### Auth
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/auth/login` | Login, returns JWT token |
-| GET | `/api/auth/me` | Current admin info |
-
-#### Components
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/components` | List all components |
-| POST | `/api/components` | Create component |
-| PATCH | `/api/components/:id` | Update component |
-| DELETE | `/api/components/:id` | Delete component |
-| GET | `/api/components/:id/subcomponents` | List subcomponents by parent |
-
-#### Subcomponents
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/subcomponents` | Create subcomponent |
-| PATCH | `/api/subcomponents/:id` | Update subcomponent |
-
-#### Incidents
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/incidents` | List incidents |
-| POST | `/api/incidents` | Create incident |
-| PATCH | `/api/incidents/:id` | Update incident |
-| POST | `/api/incidents/:id/update` | Add timeline update |
-| GET | `/api/incidents/:id/updates` | Get timeline updates |
-
-#### Maintenance
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/maintenance` | List maintenance windows |
-| POST | `/api/maintenance` | Schedule maintenance |
-| PATCH | `/api/maintenance/:id` | Update maintenance |
-
-#### Monitors
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/monitors` | List monitors |
-| POST | `/api/monitors` | Create monitor |
-| DELETE | `/api/monitors/:id` | Delete monitor |
-| GET | `/api/monitors/:id/logs` | Monitor check logs |
-| GET | `/api/monitors/:id/uptime` | 90-day uptime data |
-
-#### Subscribers
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/subscribers` | List subscribers |
-| DELETE | `/api/subscribers/:id` | Remove subscriber |
-
-## Monitoring Worker
-
-The worker runs continuous health checks on all configured monitors:
-
-- **HTTP** — GET request, checks status code (default: 200)
-- **TCP** — TCP dial to host:port
-- **DNS** — Resolves a hostname, checks for expected IP
-- **Ping (ICMP)** — ICMP echo request (requires root/capabilities in Docker)
-
-**Auto-incident behavior:**
-- After **3 consecutive failures** → automatically creates a new incident and sets component status to `major_outage`
-- When monitor recovers → auto-resolves the incident and restores component status to `operational`
-
-Check interval is configurable per monitor (default: 60 seconds).
-
-## WebSocket
-
-Connect to `ws://localhost:8080/ws` for real-time events:
-
-```json
-{ "type": "incident_created", "data": { ... } }
-{ "type": "incident_resolved", "data": { ... } }
-{ "type": "component_updated", "data": { ... } }
-```
-
-## Component Status Values
-
-| Status | Description |
-|--------|-------------|
-| `operational` | Fully operational |
-| `degraded_performance` | Slower than normal |
-| `partial_outage` | Some requests failing |
-| `major_outage` | Service unavailable |
-| `maintenance` | Scheduled maintenance |
-
-## Production Deployment
-
-1. **Change secrets** in `.env`:
-   - `JWT_SECRET` — use a long random string
-   - `ADMIN_PASSWORD` — use a strong password
-
-2. **Set MongoDB credentials** — update `MONGO_URI` with auth
-
-3. **Reverse proxy** — put Nginx or Caddy in front, terminate TLS
-
-4. **ICMP monitoring** — the worker container needs `NET_RAW` capability (already configured in `docker-compose.yml`)
-
-5. **Backups** — back up the MongoDB `statusplatform` database
-
-## License
+- `GET http://localhost:8080/health`
+- Returns 200 if healthy, 503 if MongoDB or Redis are unreachable
+- Response includes detailed DB connectivity status
 
 MIT
