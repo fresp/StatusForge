@@ -39,6 +39,38 @@ This implementation consolidates the previous 3 separate services (API, Worker, 
 - **Health Check** - `/health` endpoint with database connectivity verification
 - **Graceful Shutdown** - 30s timeout with proper goroutine cleanup
 
+## 📸 Screenshots
+
+### Public Status Page
+![Public Status Page](docs/images/public-statuspage.jpeg)
+
+Clean, professional status page showing component health and incident history
+
+### Admin Dashboard
+![Admin Dashboard](docs/images/admin-dashboard.png)
+
+Main admin interface with navigation and quick overview
+
+### Component Management
+![Component Management](docs/images/admin-component.png)
+
+Create and manage components and their sub-components
+
+### Incident Timeline
+![Incident Timeline](docs/images/admin-incident.png)
+
+Full incident lifecycle with status updates and timeline
+
+### Monitoring Overview
+![Monitoring Overview](docs/images/admin-monitoring.png)
+
+Real-time monitoring status and uptime metrics
+
+### Maintenance Scheduling
+![Maintenance Scheduling](docs/images/admin-maintenance.png)
+
+Schedule and manage planned maintenance windows
+
 ## 📋 Dependencies
 
 - **Backend**: Go 1.21+
