@@ -89,7 +89,7 @@ REDIS_ADDR=redis:6379
 JWT_SECRET=super-secret-jwt-key-change-in-production
 ADMIN_EMAIL=admin@statusplatform.com
 ADMIN_PASSWORD=admin123
-```
+````
 
 ### Development
 - Backend: `go run cmd/server/main.go`
