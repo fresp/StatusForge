@@ -51,6 +51,7 @@ export interface Incident {
   createdAt: string
   updatedAt: string
   resolvedAt?: string
+  updates?: IncidentUpdate[]
 }
 
 export interface IncidentUpdate {

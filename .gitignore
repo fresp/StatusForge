@@ -91,3 +91,5 @@ id_rsa*
 
 
 apps/web/node_modules/
+.env
+/apps/web/dist
