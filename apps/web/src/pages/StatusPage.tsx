@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react'
-import { CheckCircle, AlertTriangle, AlertCircle, XCircle, Wrench } from 'lucide-react'
+import React, { useState, useCallback, useMemo } from 'react'
+import { CheckCircle, AlertTriangle, AlertCircle, XCircle, Wrench, ChevronDown, ChevronUp } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { StatusSummary, ComponentWithSubs, Incident, Maintenance } from '../types'
 import { STATUS_COLORS, STATUS_LABELS, STATUS_TEXT_COLORS, getOverallStatusLabel, formatDate, formatDateShort, INCIDENT_STATUS_LABELS, INCIDENT_IMPACT_LABELS } from '../lib/utils'
+import { IncidentTimeline } from '../components/IncidentTimeline'
 
 function StatusIcon({ status }: { status: string }) {
   const cls = 'w-5 h-5'
@@ -56,6 +57,7 @@ export default function StatusPage() {
   const activeIncidents = incidentData?.active || []
   const resolvedIncidents = incidentData?.resolved || []
   const upcomingMaintenance = maintenanceData?.filter(m => m.status !== 'completed') || []
+  const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set())
 
   const headerBg: Record<string, string> = {
     operational: 'bg-green-600',
@@ -84,22 +86,44 @@ export default function StatusPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
 
         {/* Active Incidents Banner */}
-        {activeIncidents.map(incident => (
-          <div key={incident.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <h3 className="font-semibold text-red-900">{incident.title}</h3>
-                <p className="text-red-700 text-sm mt-1">{incident.description}</p>
-                <div className="flex gap-4 mt-2 text-xs text-red-600">
-                  <span>Status: {INCIDENT_STATUS_LABELS[incident.status]}</span>
-                  <span>Impact: {INCIDENT_IMPACT_LABELS[incident.impact]}</span>
-                  <span>Since: {formatDate(incident.createdAt)}</span>
+        {activeIncidents.map(incident => {
+          const isExpanded = expandedIncidents.has(incident.id)
+          return (
+            <div key={incident.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-red-900">{incident.title}</h3>
+                      <p className="text-red-700 text-sm mt-1">{incident.description}</p>
+                      <div className="flex gap-4 mt-2 text-xs text-red-600">
+                        <span>Status: {INCIDENT_STATUS_LABELS[incident.status]}</span>
+                        <span>Impact: {INCIDENT_IMPACT_LABELS[incident.impact]}</span>
+                        <span>Since: {formatDate(incident.createdAt)}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setExpandedIncidents(prev => {
+                        const next = new Set(prev)
+                        if (next.has(incident.id)) {
+                          next.delete(incident.id)
+                        } else {
+                          next.add(incident.id)
+                        }
+                        return next
+                      })}
+                      className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                    >
+                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {isExpanded && <IncidentTimeline updates={incident.updates || []} />}
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {/* Upcoming Maintenance */}
         {upcomingMaintenance.map(m => (
@@ -177,23 +201,43 @@ export default function StatusPage() {
           <div>
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Incident History</h2>
             <div className="space-y-4">
-              {resolvedIncidents.map(incident => (
-                <div key={incident.id} className="bg-white rounded-xl border border-gray-200 p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{incident.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{incident.description}</p>
+              {resolvedIncidents.map(incident => {
+                const isExpanded = expandedIncidents.has(incident.id)
+                return (
+                  <div key={incident.id} className="bg-white rounded-xl border border-gray-200 p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-medium text-gray-900">{incident.title}</h3>
+                        <p className="text-sm text-gray-600 mt-1">{incident.description}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                          Resolved
+                        </span>
+                        <button
+                          onClick={() => setExpandedIncidents(prev => {
+                            const next = new Set(prev)
+                            if (next.has(incident.id)) {
+                              next.delete(incident.id)
+                            } else {
+                              next.add(incident.id)
+                            }
+                            return next
+                          })}
+                          className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                        >
+                          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        </button>
+                      </div>
                     </div>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                      Resolved
-                    </span>
+                    <div className="flex gap-4 mt-3 text-xs text-gray-400">
+                      <span>Created: {formatDate(incident.createdAt)}</span>
+                      {incident.resolvedAt && <span>Resolved: {formatDate(incident.resolvedAt)}</span>}
+                    </div>
+                    {isExpanded && <IncidentTimeline updates={incident.updates || []} />}
                   </div>
-                  <div className="flex gap-4 mt-3 text-xs text-gray-400">
-                    <span>Created: {formatDate(incident.createdAt)}</span>
-                    {incident.resolvedAt && <span>Resolved: {formatDate(incident.resolvedAt)}</span>}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

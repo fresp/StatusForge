@@ -6,6 +6,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type IncidentWithUpdates struct {
+	Incident
+	Updates  []IncidentUpdate `json:"updates"`
+}
+
 type IncidentStatus string
 
 const (

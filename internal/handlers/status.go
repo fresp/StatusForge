@@ -46,6 +46,32 @@ type IncidentStatusInfo struct {
 	Title    string    `json:"title"`
 }
 
+// fetchIncidentUpdates fetches incident updates for multiple incident IDs in batch
+func fetchIncidentUpdates(ctx context.Context, db *mongo.Database, incidentIDs []primitive.ObjectID) (map[primitive.ObjectID][]models.IncidentUpdate, error) {
+	if len(incidentIDs) == 0 {
+		return map[primitive.ObjectID][]models.IncidentUpdate{}, nil
+	}
+
+	cursor, err := db.Collection("incident_updates").Find(ctx,
+		bson.M{"incidentId": bson.M{"$in": incidentIDs}},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	updatesByIncident := map[primitive.ObjectID][]models.IncidentUpdate{}
+	var updates []models.IncidentUpdate
+	if err := cursor.All(ctx, &updates); err != nil {
+		return nil, err
+	}
+
+	for _, update := range updates {
+		updatesByIncident[update.IncidentID] = append(updatesByIncident[update.IncidentID], update)
+	}
+
+	return updatesByIncident, nil
+}
 func GetStatusSummary(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -322,7 +348,6 @@ func GetStatusIncidents(db *mongo.Database) gin.HandlerFunc {
 			resolvedCursor.All(ctx, &resolvedIncidents)
 			resolvedCursor.Close(ctx)
 		}
-
 		if activeIncidents == nil {
 			activeIncidents = []models.Incident{}
 		}
@@ -330,9 +355,49 @@ func GetStatusIncidents(db *mongo.Database) gin.HandlerFunc {
 			resolvedIncidents = []models.Incident{}
 		}
 
+		// Collect all incident IDs for batch update fetch
+		allIDs := make([]primitive.ObjectID, 0, len(activeIncidents)+len(resolvedIncidents))
+		for _, inc := range activeIncidents {
+			allIDs = append(allIDs, inc.ID)
+		}
+		for _, inc := range resolvedIncidents {
+			allIDs = append(allIDs, inc.ID)
+		}
+
+		// Fetch all updates in a single batch query
+		updatesMap, err := fetchIncidentUpdates(ctx, db, allIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Attach updates to each incident
+		var activeWithUpdates []models.IncidentWithUpdates
+		for _, inc := range activeIncidents {
+			activeWithUpdates = append(activeWithUpdates, models.IncidentWithUpdates{
+				Incident: inc,
+				Updates:  updatesMap[inc.ID],
+			})
+		}
+
+		var resolvedWithUpdates []models.IncidentWithUpdates
+		for _, inc := range resolvedIncidents {
+			resolvedWithUpdates = append(resolvedWithUpdates, models.IncidentWithUpdates{
+				Incident: inc,
+				Updates:  updatesMap[inc.ID],
+			})
+		}
+
+		if activeWithUpdates == nil {
+			activeWithUpdates = []models.IncidentWithUpdates{}
+		}
+		if resolvedWithUpdates == nil {
+			resolvedWithUpdates = []models.IncidentWithUpdates{}
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"active":   activeIncidents,
-			"resolved": resolvedIncidents,
+			"active":   activeWithUpdates,
+			"resolved": resolvedWithUpdates,
 		})
 	}
 }
