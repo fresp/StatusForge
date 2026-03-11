@@ -1,127 +1,127 @@
 # StatusForge
 
-An open-source, self-hosted status page platform for monitoring services and managing incidents. Similar to Atlassian Statuspage and other commercial status page providers.
+An open-source, self-hosted status page platform for monitoring services and managing incidents.
 
 ---
 
 ## Features
 
-- Service status monitoring 
-- Incident management with timeline
-- Public status page for transparency
-- Real-time updates (WebSocket)
-- Self-hosted deployment with full control  
-- Simple, unified architecture
+- **Service Monitoring** - Track the status of your services in real-time
+- **Incident Management** - Create, update, and resolve incidents with timelines
+- **Public Status Page** - Share service status with your users
+- **Real-time Updates** - WebSocket-powered live updates
+- **Self-hosted** - Full control over your data and infrastructure
+- **Lightweight Architecture** - Simple Go backend with React frontend
 
 ---
 
 ## Screenshots
 
-Dashboard | Public Status Page | Incident Timeline
---- | --- | ---
-![Admin Dashboard](docs/images/admin-dashboard.png) | ![Public Status Page](docs/images/public-statuspage.jpeg) | ![Incident Timeline](docs/images/admin-incident.png)
+| Dashboard | Public Status Page | Incident Timeline |
+|-----------|-------------------|-------------------|
+| ![Dashboard](docs/images/admin-dashboard.png) | ![Status Page](docs/images/public-statuspage.jpeg) | ![Incidents](docs/images/admin-incident.png) |
 
 ---
 
 ## Quick Start
 
-### Docker Compose (Recommended)
+The fastest way to run StatusForge:
 
 ```bash
 docker-compose up --build
 ```
 
 Access the platform:
-- Status page: http://localhost:8080
-- Admin panel: http://localhost:8080/admin
+- **Status page**: http://localhost:8080
+- **Admin panel**: http://localhost:8080/admin
 
 Default credentials:
 ```
-Email: admin@statusplatform.com 
+Email: admin@statusplatform.com
 Password: admin123
 ```
 
-### Manual Installation
-
-See installation guide below.
+> ⚠️ Change the default credentials in production!
 
 ---
 
 ## Tech Stack
 
-### Backend
-- **Go** - Main backend language with concurrency
-- **Gin** - Web framework
-- **MongoDB** - Primary database 
-- **Redis** - Cache and pub-sub
+**Backend**
+- Go
+- Gin
+- MongoDB
+- Redis
 
-### Frontend
-- **React** - UI framework
-- **Vite** - Build tooling
-- **Tailwind CSS** - Styling
+**Frontend**
+- React
+- Vite
+- Tailwind CSS
 
 ---
 
-## Installation
-
-Clone the repository:
-```bash
-git clone https://github.com/fresp/StatusForge.git
-cd StatusForge
-```
+## Local Development
 
 ### Prerequisites
-- Docker & Docker Compose
 
-### Run with Docker Compose
-```bash
-docker-compose up --build
-```
+- Go 1.21+
+- Node.js 20+
+- MongoDB
+- Redis
 
-### Configuration
+### Setup
 
-Copy `.env.example` to `.env` and customize:
-````
-PORT=8080
-MONGO_URI=mongodb://mongo:27017
-MONGO_DB_NAME=statusplatform
-REDIS_ADDR=redis:6379
-JWT_SECRET=super-secret-jwt-key-change-in-production
-ADMIN_EMAIL=admin@statusplatform.com
-ADMIN_PASSWORD=admin123
-````
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/fresp/StatusForge.git
+   cd StatusForge
+   ```
 
-### Development
-- Backend: `go run cmd/server/main.go`
-- Frontend: `cd apps/web && npm run dev`
+2. **Configure environment**
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` with your settings.
+
+3. **Run backend**
+   ```bash
+   go run cmd/server/main.go
+   ```
+
+4. **Run frontend** (in a new terminal)
+   ```bash
+   cd apps/web
+   npm install
+   npm run dev
+   ```
 
 ---
 
 ## Roadmap
 
-- Multi database support (PostgreSQL, MySQL)
-- Role-based multi-user admin system
-- Enhanced notification system (Slack, Teams, Webhooks)
-- Advanced monitoring checks (ICMP, SSL expiry, etc.)
-- Custom status page themes
-- Email/SMS/Webhook notifications
-- Maintenance window management
-- Reporting and analytics
+- [ ] Multi-database support (PostgreSQL, MySQL)
+- [ ] Role-based multi-user admin system
+- [ ] Notification channels (Email, Slack, Webhooks)
+- [ ] Advanced monitoring checks (ICMP, SSL expiry)
+- [ ] Custom status page themes
+- [ ] Maintenance window scheduling
+- [ ] Analytics and reporting
 
 ---
 
 ## Contributing
 
-We welcome contributions! This is an open-source project looking for community support.
+Contributions are welcome!
 
-- Report issues and suggest features
-- Contribute code and documentation
-- Help improve the platform for everyone
+- Report bugs and request features via [Issues](https://github.com/fresp/StatusForge/issues)
+- Submit pull requests for bug fixes and improvements
+- Help improve documentation
 
-Detailed developer documentation is located in `/docs`.
+Detailed technical documentation is available in the [`/docs`](docs/) directory.
 
 ---
 
 ## License
 
-MIT
+[MIT](LICENSE)
