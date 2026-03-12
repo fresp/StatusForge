@@ -11,7 +11,9 @@ RUN npm ci
 RUN npm run build
 
 # Build the Go backend
-FROM golang:1.21-alpine AS backend-build
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS backend-build
+
+ARG TARGETARCH
 
 # Install build tools
 RUN apk add --no-cache ca-certificates git musl-dev gcc libcap-dev
@@ -26,19 +28,17 @@ RUN go mod download
 COPY . .
 
 # Copy built frontend assets
-COPY --from=frontend-build /app/dist /app/apps/web/dist
+COPY --from=frontend-build /app/dist /app/internal/embed/dist
 
-# Build static binary
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o server cmd/server/main.go
-
-# Create user for running the binary
-RUN adduser -D -u 1001 appuser
+# Build binary (auto-detect arch for M1/ARM64 support)
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -a -installsuffix cgo -o server cmd/server/main.go
 
 # Final minimal image
 FROM alpine:latest
 
-# Install ca-certificates
-RUN apk --no-cache add ca-certificates
+# Upgrade packages and install ca-certificates
+RUN apk upgrade --no-cache && \
+    apk --no-cache add ca-certificates
 
 RUN adduser -D -u 1001 appuser
 
