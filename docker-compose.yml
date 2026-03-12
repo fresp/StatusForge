@@ -10,10 +10,10 @@ services:
     env_file: .env
     environment:
       ENABLE_WORKER: ${ENABLE_WORKER:-true}
-      MONGO_URI: mongodb://mongo:27017
-      MONGO_DB_NAME: statusplatform
-      REDIS_ADDR: redis:6379
-      PORT: 8080
+      MONGO_URI: ${MONGO_URI:-mongodb://root:strongpassword@mongo:27017/statusplatform?authSource=admin}
+      MONGO_DB_NAME: ${MONGO_DB:-statusplatform}
+      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
+      PORT: ${PORT:-8080}
     ports:
       - "8080:8080"
     depends_on:
