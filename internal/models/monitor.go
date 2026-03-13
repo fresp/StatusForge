@@ -31,7 +31,10 @@ type Monitor struct {
 	TimeoutSeconds  int                `bson:"timeoutSeconds" json:"timeoutSeconds"`
 	ComponentID     primitive.ObjectID `bson:"componentId,omitempty" json:"componentId,omitempty"`
 	SubComponentID  primitive.ObjectID `bson:"subComponentId,omitempty" json:"subComponentId,omitempty"`
+	LastStatus      MonitorLogStatus   `bson:"lastStatus,omitempty" json:"lastStatus,omitempty"`
+	LastCheckedAt   time.Time          `bson:"lastCheckedAt,omitempty" json:"lastCheckedAt,omitempty"`
 	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
+	UpdatedAt       time.Time          `bson:"updatedAt,omitempty" json:"updatedAt,omitempty"`
 }
 
 

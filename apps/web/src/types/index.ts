@@ -81,6 +81,8 @@ export interface Monitor {
   timeoutSeconds: number
   componentId: string
   subComponentId?: string
+  lastStatus?: MonitorLogStatus
+  lastCheckedAt?: string
   createdAt: string
 }
 

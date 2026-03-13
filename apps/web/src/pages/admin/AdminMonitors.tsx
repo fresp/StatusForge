@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Plus, Trash2, X, Activity } from 'lucide-react'
+import { Plus, Trash2, X, Activity, Edit2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import { useApi } from '../../hooks/useApi'
 import api from '../../lib/api'
 import type { Monitor, Component, SubComponent, MonitorType } from '../../types'
@@ -55,18 +55,55 @@ export default function AdminMonitors() {
   const { data: components } = useApi<Component[]>('/components')
   const { data: subcomponents = [] } = useApi<SubComponent[]>('/subcomponents')
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{status: string, responseTime: number} | null>(null)
   const [error, setError] = useState('')
   
   function openCreate() {
+    setEditingId(null)
     setForm({ ...DEFAULT_FORM, componentId: components?.[0]?.id || '', subComponentId: '' })
     setError('')
+    setTestResult(null)
+    setShowModal(true)
+  }
+
+  function openEdit(m: Monitor) {
+    setEditingId(m.id || null)
+    setForm({
+      name: m.name,
+      type: m.type,
+      target: m.target,
+      intervalSeconds: m.intervalSeconds,
+      timeoutSeconds: m.timeoutSeconds,
+      componentId: m.componentId || '',
+      subComponentId: m.subComponentId || '',
+    })
+    setError('')
+    setTestResult(null)
     setShowModal(true)
   }
 
   function closeModal() {
     setShowModal(false)
+    setEditingId(null)
+    setTestResult(null)
+  }
+
+  async function handleTest() {
+    setTesting(true)
+    setTestResult(null)
+    setError('')
+    try {
+      const res = await api.post('/monitors/test', form)
+      setTestResult(res.data)
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to test monitor')
+    } finally {
+      setTesting(false)
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -74,11 +111,15 @@ export default function AdminMonitors() {
     setSaving(true)
     setError('')
     try {
-      await api.post('/monitors', form)
+      if (editingId) {
+        await api.put(`/monitors/${editingId}`, form)
+      } else {
+        await api.post('/monitors', form)
+      }
       await refetch()
       closeModal()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create monitor')
+      setError(err.response?.data?.error || `Failed to ${editingId ? 'update' : 'create'} monitor`)
     } finally {
       setSaving(false)
     }
@@ -135,6 +176,7 @@ export default function AdminMonitors() {
               <th className="text-left px-6 py-3 font-medium text-gray-600">Name</th>
               <th className="text-left px-6 py-3 font-medium text-gray-600">Type</th>
               <th className="text-left px-6 py-3 font-medium text-gray-600">Target</th>
+              <th className="text-left px-6 py-3 font-medium text-gray-600">Status</th>
               <th className="text-left px-6 py-3 font-medium text-gray-600">Component</th>
               <th className="text-left px-6 py-3 font-medium text-gray-600">Interval</th>
               <th className="px-6 py-3" />
@@ -151,10 +193,31 @@ export default function AdminMonitors() {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-gray-500 max-w-xs truncate font-mono text-xs">{m.target}</td>
+                <td className="px-6 py-4">
+                  {m.lastStatus === 'up' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Up
+                    </span>
+                  ) : m.lastStatus === 'down' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                      <XCircle className="w-3.5 h-3.5" />
+                      Down
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Pending
+                    </span>
+                  )}
+                </td>
                 <td className="px-6 py-4 text-gray-500">{getComponentNameAndSubcomponentText(m)}</td>
                 <td className="px-6 py-4 text-gray-500">{m.intervalSeconds}s</td>
                 <td className="px-6 py-4">
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => openEdit(m)} className="text-gray-400 hover:text-blue-600 transition-colors">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
                     <button onClick={() => handleDelete(m)} className="text-gray-400 hover:text-red-600 transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -164,7 +227,7 @@ export default function AdminMonitors() {
             ))}
             {(monitors || []).length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-400">No monitors configured. Add one to start tracking uptime.</td>
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">No monitors configured. Add one to start tracking uptime.</td>
               </tr>
             )}
           </tbody>
@@ -172,7 +235,7 @@ export default function AdminMonitors() {
       </div>
 
       {showModal && (
-        <Modal title="New Monitor" onClose={closeModal}>
+        <Modal title={editingId ? "Edit Monitor" : "New Monitor"} onClose={closeModal}>
           {error && <p className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <form onSubmit={handleSave} className="space-y-4">
             <div>
@@ -264,10 +327,19 @@ export default function AdminMonitors() {
               <button type="button" onClick={closeModal} className="flex-1 border border-gray-300 text-gray-700 rounded-lg py-2 text-sm hover:bg-gray-50">
                 Cancel
               </button>
+              <button type="button" onClick={handleTest} disabled={testing || !form.target} className="flex-1 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-60 rounded-lg py-2 text-sm font-medium">
+                {testing ? 'Testing...' : 'Test Target'}
+              </button>
               <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg py-2 text-sm font-medium">
-                {saving ? 'Creating...' : 'Create Monitor'}
+                {saving ? 'Saving...' : (editingId ? 'Update Monitor' : 'Create Monitor')}
               </button>
             </div>
+            {testResult && (
+              <div className={`px-3 py-2 rounded-lg text-sm flex items-center justify-between ${testResult.status === 'up' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                <span className="font-medium">Test Result: {testResult.status.toUpperCase()}</span>
+                <span>{testResult.responseTime}ms</span>
+              </div>
+            )}
           </form>
         </Modal>
       )}

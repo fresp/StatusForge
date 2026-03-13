@@ -6,9 +6,6 @@ package server
 import (
 	"context"
 	"log"
-	"net"
-	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -17,10 +14,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
 
 	"status-platform/internal/models"
+	"status-platform/internal/utils"
 )
 
 // workerCtx and workerCancel are used to signal shutdown to all worker goroutines
@@ -102,21 +98,21 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 
 	switch mon.Type {
 	case models.MonitorHTTP:
-		code, err := checkHTTP(mon.Target, timeout)
+		code, err := utils.CheckHTTP(mon.Target, timeout)
 		statusCode = code
 		if err != nil || code >= 500 || code == 0 {
 			status = models.MonitorDown
 		}
 	case models.MonitorTCP:
-		if err := checkTCP(mon.Target, timeout); err != nil {
+		if err := utils.CheckTCP(mon.Target, timeout); err != nil {
 			status = models.MonitorDown
 		}
 	case models.MonitorDNS:
-		if err := checkDNS(mon.Target, timeout); err != nil {
+		if err := utils.CheckDNS(mon.Target, timeout); err != nil {
 			status = models.MonitorDown
 		}
 	case models.MonitorPing:
-		if err := checkPing(mon.Target, timeout); err != nil {
+		if err := utils.CheckPing(mon.Target, timeout); err != nil {
 			status = models.MonitorDown
 		}
 	}
@@ -136,71 +132,19 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 	defer cancel2()
 
 	db.Collection("monitor_logs").InsertOne(ctx2, logEntry)
+	
+	db.Collection("monitors").UpdateOne(ctx2, 
+		bson.M{"_id": mon.ID},
+		bson.M{"$set": bson.M{
+			"lastStatus":    status,
+			"lastCheckedAt": time.Now(),
+		}},
+	)
+	
 	updateDailyUptime(db, mon.ID, status)
 	detectOutage(db, mon, status)
 }
 
-func checkHTTP(target string, timeout time.Duration) (int, error) {
-	client := &http.Client{Timeout: timeout}
-	resp, err := client.Get(target)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode, nil
-}
-
-func checkTCP(target string, timeout time.Duration) error {
-	conn, err := net.DialTimeout("tcp", target, timeout)
-	if err != nil {
-		return err
-	}
-	conn.Close()
-	return nil
-}
-
-func checkDNS(target string, timeout time.Duration) error {
-	resolver := &net.Resolver{}
-	ctx, cancel := context.WithTimeout(workerCtx, timeout)
-	defer cancel()
-	_, err := resolver.LookupHost(ctx, target)
-	return err
-}
-
-func checkPing(target string, timeout time.Duration) error {
-	conn, err := icmp.ListenPacket("udp4", "")
-	if err != nil {
-		c, err2 := net.DialTimeout("tcp", target+":80", timeout)
-		if err2 != nil {
-			return err2
-		}
-		c.Close()
-		return nil
-	}
-	defer conn.Close()
-
-	msg := icmp.Message{
-		Type: ipv4.ICMPTypeEcho,
-		Code: 0,
-		Body: &icmp.Echo{ID: os.Getpid() & 0xffff, Seq: 1, Data: []byte("ping")},
-	}
-	b, _ := msg.Marshal(nil)
-	conn.SetDeadline(time.Now().Add(timeout))
-
-	dst, err := net.ResolveIPAddr("ip4", target)
-	if err != nil {
-		return err
-	}
-	if _, err := conn.WriteTo(b, dst); err != nil {
-		return err
-	}
-
-	reply := make([]byte, 1500)
-	if _, _, err := conn.ReadFrom(reply); err != nil {
-		return err
-	}
-	return nil
-}
 
 func updateDailyUptime(db *mongo.Database, monitorID primitive.ObjectID, status models.MonitorLogStatus) {
 	ctx, cancel := context.WithTimeout(workerCtx, 5*time.Second)
@@ -290,6 +234,7 @@ func detectOutage(db *mongo.Database, mon models.Monitor, status models.MonitorL
 			ID:             primitive.NewObjectID(),
 			StartedAt:      time.Now(),
 			Status:         models.OutageActive,
+			MonitorID:      mon.ID,
 			ComponentID:    mon.ComponentID,
 			SubComponentID: mon.SubComponentID,
 		}

@@ -58,6 +58,8 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 
 	auth.GET("/monitors", handlers.GetMonitors(database.GetDB()))
 	auth.POST("/monitors", handlers.CreateMonitor(database.GetDB()))
+	auth.POST("/monitors/test", handlers.TestMonitor())
+	auth.PUT("/monitors/:id", handlers.UpdateMonitor(database.GetDB()))
 	auth.DELETE("/monitors/:id", handlers.DeleteMonitor(database.GetDB()))
 	auth.GET("/monitors/:id/logs", handlers.GetMonitorLogs(database.GetDB()))
 	auth.GET("/monitors/:id/uptime", handlers.GetMonitorUptime(database.GetDB()))
