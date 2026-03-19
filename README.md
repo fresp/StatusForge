@@ -8,8 +8,11 @@ An open-source, self-hosted status page platform for monitoring services and man
 
 - **Service Monitoring** - Track the status of your services in real-time
 - **Incident Management** - Create, update, and resolve incidents with timelines
+- **Role-Based Admin Access** - Enforce RBAC with `admin` and `operator` roles on admin APIs
+- **Operator Scope Enforcement** - Limit operator access to incidents and maintenance workflows
 - **Public Status Page** - Share service status with your users
 - **Real-time Updates** - WebSocket-powered live updates
+- **Members & Invitations Split View** - Manage active members and pending invitations in separate admin sections
 - **Self-hosted** - Full control over your data and infrastructure
 - **Lightweight Architecture** - Simple Go backend with React frontend
 
@@ -89,6 +92,8 @@ Password: admin123
    go run cmd/server/main.go
    ```
 
+   Module path: `github.com/fresp/StatusForge`
+
 4. **Run frontend** (in a new terminal)
    ```bash
    cd apps/web
@@ -101,7 +106,7 @@ Password: admin123
 ## Roadmap
 
 - [ ] Multi-database support (PostgreSQL, MySQL)
-- [ ] Role-based multi-user admin system
+- [x] Basic role-based multi-user admin system (admin/operator)
 - [ ] Notification channels (Email, Slack, Webhooks)
 - [ ] Advanced monitoring checks (ICMP, SSL expiry)
 - [ ] Custom status page themes
