@@ -11,7 +11,7 @@ RUN npm ci
 RUN npm run build
 
 # Build the Go backend
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS backend-build
+FROM golang:1.26-alpine AS backend-build
 
 ARG TARGETARCH
 

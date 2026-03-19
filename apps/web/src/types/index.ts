@@ -123,3 +123,24 @@ export interface Admin {
   username: string
   email: string
 }
+
+export type AdminRole = 'admin' | 'operator'
+
+export type AdminStatus = 'active' | 'disabled' | 'invited'
+
+export interface AdminMember {
+  id: string
+  username: string
+  email: string
+  role: AdminRole
+  status: AdminStatus
+}
+
+export interface AdminInvitation {
+  id: string
+  email: string
+  role: AdminRole
+  expiresAt: string
+  createdAt: string
+  isExpired: boolean
+}

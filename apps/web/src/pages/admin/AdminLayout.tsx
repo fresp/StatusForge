@@ -8,9 +8,26 @@ import {
   Wrench,
   Activity,
   Users,
+  Shield,
   LogOut,
   ExternalLink,
 } from 'lucide-react'
+import type { AdminRole } from '../../types'
+
+interface StoredAdminProfile {
+  role?: AdminRole
+}
+
+function readStoredRole(): AdminRole | null {
+  try {
+    const raw = localStorage.getItem('admin_profile')
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StoredAdminProfile
+    return parsed.role ?? null
+  } catch {
+    return null
+  }
+}
 
 const navItems = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -20,13 +37,19 @@ const navItems = [
   { to: '/admin/maintenance', label: 'Maintenance', icon: Wrench, end: false },
   { to: '/admin/monitors', label: 'Monitors', icon: Activity, end: false },
   { to: '/admin/subscribers', label: 'Subscribers', icon: Users, end: false },
+  { to: '/admin/members', label: 'Members', icon: Shield, end: false },
 ]
+
+const OPERATOR_ALLOWED = new Set(['/admin/incidents', '/admin/maintenance'])
 
 export default function AdminLayout() {
   const navigate = useNavigate()
+  const role = readStoredRole()
+  const visibleNavItems = role === 'operator' ? navItems.filter(item => OPERATOR_ALLOWED.has(item.to)) : navItems
 
   function handleLogout() {
     localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_profile')
     navigate('/admin/login')
   }
 
@@ -40,7 +63,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 py-4 space-y-0.5 px-3">
-          {navItems.map(({ to, label, icon: Icon, end }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}

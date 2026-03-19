@@ -1,10 +1,8 @@
 package server
 
 import (
-	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 

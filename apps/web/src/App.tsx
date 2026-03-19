@@ -10,11 +10,41 @@ import AdminIncidents from './pages/admin/AdminIncidents'
 import AdminMaintenance from './pages/admin/AdminMaintenance'
 import AdminMonitors from './pages/admin/AdminMonitors'
 import AdminSubscribers from './pages/admin/AdminSubscribers'
+import AdminMembers from './pages/admin/AdminMembers'
+import AdminActivate from './pages/admin/AdminActivate'
+import type { AdminRole } from './types'
+
+interface StoredAdminProfile {
+  role?: AdminRole
+}
+
+function readStoredRole(): AdminRole | null {
+  try {
+    const raw = localStorage.getItem('admin_profile')
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StoredAdminProfile
+    return parsed.role ?? null
+  } catch {
+    return null
+  }
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('admin_token')
   if (!token) return <Navigate to="/admin/login" replace />
   return <>{children}</>
+}
+
+function RoleRoute({ allowed, children }: { allowed: AdminRole[]; children: React.ReactNode }) {
+  const role = readStoredRole()
+  if (!role || !allowed.includes(role)) return <Navigate to="/admin/incidents" replace />
+  return <>{children}</>
+}
+
+function AdminIndexRedirect() {
+  const role = readStoredRole()
+  if (role === 'operator') return <Navigate to="/admin/incidents" replace />
+  return <AdminDashboard />
 }
 
 export default function App() {
@@ -25,6 +55,7 @@ export default function App() {
 
       {/* Admin auth */}
       <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/activate" element={<AdminActivate />} />
 
       {/* Admin protected routes */}
       <Route
@@ -35,13 +66,49 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<AdminDashboard />} />
-        <Route path="components" element={<AdminComponents />} />
-        <Route path="subcomponents" element={<AdminSubComponents />} />
+        <Route index element={<AdminIndexRedirect />} />
+        <Route
+          path="components"
+          element={
+            <RoleRoute allowed={['admin']}>
+              <AdminComponents />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="subcomponents"
+          element={
+            <RoleRoute allowed={['admin']}>
+              <AdminSubComponents />
+            </RoleRoute>
+          }
+        />
         <Route path="incidents" element={<AdminIncidents />} />
         <Route path="maintenance" element={<AdminMaintenance />} />
-        <Route path="monitors" element={<AdminMonitors />} />
-        <Route path="subscribers" element={<AdminSubscribers />} />
+        <Route
+          path="monitors"
+          element={
+            <RoleRoute allowed={['admin']}>
+              <AdminMonitors />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="subscribers"
+          element={
+            <RoleRoute allowed={['admin']}>
+              <AdminSubscribers />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="members"
+          element={
+            <RoleRoute allowed={['admin']}>
+              <AdminMembers />
+            </RoleRoute>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

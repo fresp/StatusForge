@@ -40,44 +40,59 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 	api.POST("/subscribe", handlers.Subscribe(database.GetDB()))
 
 	api.POST("/auth/login", handlers.Login(database.GetDB(), cfg.JWTSecret))
+	api.POST("/admins/invitations/activate", handlers.ActivateAdminInvitation(database.GetDB()))
 
 	auth := api.Group("")
 	auth.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
 	auth.GET("/auth/me", handlers.GetMe(database.GetDB()))
 
-	auth.GET("/components", handlers.GetComponents(database.GetDB()))
-	auth.POST("/components", handlers.CreateComponent(database.GetDB(), hub))
-	auth.PATCH("/components/:id", handlers.UpdateComponent(database.GetDB(), hub))
-	auth.DELETE("/components/:id", handlers.DeleteComponent(database.GetDB()))
+	adminOnly := auth.Group("")
+	adminOnly.Use(middleware.RequireRoles("admin"))
 
-	auth.GET("/components/:id/subcomponents", handlers.GetSubComponents(database.GetDB()))
-	auth.GET("/subcomponents", handlers.GetSubComponents(database.GetDB()))
-	auth.POST("/subcomponents", handlers.CreateSubComponent(database.GetDB()))
-	auth.PATCH("/subcomponents/:id", handlers.UpdateSubComponent(database.GetDB()))
+	incidentAndMaintenance := auth.Group("")
+	incidentAndMaintenance.Use(middleware.RequireRoles("admin", "operator"))
 
-	auth.GET("/monitors", handlers.GetMonitors(database.GetDB()))
-	auth.POST("/monitors", handlers.CreateMonitor(database.GetDB()))
-	auth.POST("/monitors/test", handlers.TestMonitor())
-	auth.PUT("/monitors/:id", handlers.UpdateMonitor(database.GetDB()))
-	auth.DELETE("/monitors/:id", handlers.DeleteMonitor(database.GetDB()))
-	auth.GET("/monitors/:id/logs", handlers.GetMonitorLogs(database.GetDB()))
-	auth.GET("/monitors/:id/uptime", handlers.GetMonitorUptime(database.GetDB()))
-	auth.GET("/monitors/:id/history", handlers.GetMonitorHistory(database.GetDB()))
-	auth.GET("/monitors/outages", handlers.GetMonitorOutages(database.GetDB()))
+	incidentAndMaintenance.GET("/incidents", handlers.GetIncidents(database.GetDB()))
+	incidentAndMaintenance.POST("/incidents", handlers.CreateIncident(database.GetDB(), hub))
+	incidentAndMaintenance.PATCH("/incidents/:id", handlers.UpdateIncident(database.GetDB(), hub))
+	incidentAndMaintenance.POST("/incidents/:id/update", handlers.AddIncidentUpdate(database.GetDB(), hub))
+	incidentAndMaintenance.GET("/incidents/:id/updates", handlers.GetIncidentUpdates(database.GetDB()))
 
-	auth.GET("/incidents", handlers.GetIncidents(database.GetDB()))
-	auth.POST("/incidents", handlers.CreateIncident(database.GetDB(), hub))
-	auth.PATCH("/incidents/:id", handlers.UpdateIncident(database.GetDB(), hub))
-	auth.POST("/incidents/:id/update", handlers.AddIncidentUpdate(database.GetDB(), hub))
-	auth.GET("/incidents/:id/updates", handlers.GetIncidentUpdates(database.GetDB()))
+	incidentAndMaintenance.GET("/maintenance", handlers.GetMaintenance(database.GetDB()))
+	incidentAndMaintenance.POST("/maintenance", handlers.CreateMaintenance(database.GetDB()))
+	incidentAndMaintenance.PATCH("/maintenance/:id", handlers.UpdateMaintenance(database.GetDB()))
 
-	auth.GET("/maintenance", handlers.GetMaintenance(database.GetDB()))
-	auth.POST("/maintenance", handlers.CreateMaintenance(database.GetDB()))
-	auth.PATCH("/maintenance/:id", handlers.UpdateMaintenance(database.GetDB()))
+	incidentAndMaintenance.GET("/components", handlers.GetComponents(database.GetDB()))
+	incidentAndMaintenance.GET("/components/:id/subcomponents", handlers.GetSubComponents(database.GetDB()))
+	incidentAndMaintenance.GET("/subcomponents", handlers.GetSubComponents(database.GetDB()))
 
-	auth.GET("/subscribers", handlers.GetSubscribers(database.GetDB()))
-	auth.DELETE("/subscribers/:id", handlers.DeleteSubscriber(database.GetDB()))
+	adminOnly.POST("/components", handlers.CreateComponent(database.GetDB(), hub))
+	adminOnly.PATCH("/components/:id", handlers.UpdateComponent(database.GetDB(), hub))
+	adminOnly.DELETE("/components/:id", handlers.DeleteComponent(database.GetDB()))
+
+	adminOnly.POST("/subcomponents", handlers.CreateSubComponent(database.GetDB()))
+	adminOnly.PATCH("/subcomponents/:id", handlers.UpdateSubComponent(database.GetDB()))
+
+	adminOnly.GET("/monitors", handlers.GetMonitors(database.GetDB()))
+	adminOnly.POST("/monitors", handlers.CreateMonitor(database.GetDB()))
+	adminOnly.POST("/monitors/test", handlers.TestMonitor())
+	adminOnly.PUT("/monitors/:id", handlers.UpdateMonitor(database.GetDB()))
+	adminOnly.DELETE("/monitors/:id", handlers.DeleteMonitor(database.GetDB()))
+	adminOnly.GET("/monitors/:id/logs", handlers.GetMonitorLogs(database.GetDB()))
+	adminOnly.GET("/monitors/:id/uptime", handlers.GetMonitorUptime(database.GetDB()))
+	adminOnly.GET("/monitors/:id/history", handlers.GetMonitorHistory(database.GetDB()))
+	adminOnly.GET("/monitors/outages", handlers.GetMonitorOutages(database.GetDB()))
+
+	adminOnly.GET("/subscribers", handlers.GetSubscribers(database.GetDB()))
+	adminOnly.DELETE("/subscribers/:id", handlers.DeleteSubscriber(database.GetDB()))
+
+	adminOnly.GET("/admins", handlers.GetAdmins(database.GetDB()))
+	adminOnly.PATCH("/admins/:id", handlers.PatchAdmin(database.GetDB()))
+	adminOnly.POST("/admins/invitations", handlers.CreateAdminInvitation(database.GetDB()))
+	adminOnly.GET("/admins/invitations", handlers.GetAdminInvitations(database.GetDB()))
+	adminOnly.POST("/admins/invitations/:id/refresh", handlers.RefreshAdminInvitation(database.GetDB()))
+	adminOnly.DELETE("/admins/invitations/:id", handlers.RevokeAdminInvitation(database.GetDB()))
 }
 
 func SeedAdmin(db *mongo.Database, cfg *configs.Config) {
@@ -99,6 +114,8 @@ func SeedAdmin(db *mongo.Database, cfg *configs.Config) {
 		ID:           primitive.NewObjectID(),
 		Username:     cfg.AdminUser,
 		Email:        cfg.AdminEmail,
+		Role:         "admin",
+		Status:       "active",
 		PasswordHash: string(hash),
 		CreatedAt:    time.Now(),
 	}

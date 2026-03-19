@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -37,7 +36,7 @@ func TestRunServerIntegration(t *testing.T) {
 		assert.Equal(t, true, cfg.EnableWorker, "EnableWorker should default to true")
 
 		// Initialize a context for testing
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
 		// Create a simplified version of the server initialization
@@ -118,7 +117,7 @@ func TestUnifiedStartupWithMockDB(t *testing.T) {
 	}
 
 	// Create a context with timeout
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Initialize database connection
@@ -126,7 +125,7 @@ func TestUnifiedStartupWithMockDB(t *testing.T) {
 		// Skip test if database not available
 		t.Skip("Skipping integration test: MongoDB not available")
 	}
-	
+
 	if err := database.ConnectRedis(cfg.RedisAddr); err != nil {
 		// Non-fatal for this test, just log
 		t.Logf("Warning: Redis not available: %v", err)
@@ -176,4 +175,3 @@ func TestUnifiedStartupWithMockDB(t *testing.T) {
 	// Verify that we can serve the main page if embed works
 	// (skip if embed doesn't exist, which indicates a build environment)
 }
-
