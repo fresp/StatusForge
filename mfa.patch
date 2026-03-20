@@ -1,0 +1,317 @@
+--- a/internal/repository/admin_repository.go
++++ b/internal/repository/admin_repository.go
+@@ -3,12 +3,17 @@
+ import (
+ 	"context"
+ 
++	"github.com/fresp/StatusForge/internal/models"
+ 	"go.mongodb.org/mongo-driver/bson"
++	"go.mongodb.org/mongo-driver/bson/primitive"
+ 	"go.mongodb.org/mongo-driver/mongo"
+-
+-	"github.com/fresp/StatusForge/internal/models"
+ )
+ 
+ type UserRepository interface {
+ 	FindByEmail(ctx context.Context, email string) (*models.User, error)
++	FindByID(ctx context.Context, id string) (*models.User, error)
++	UpdateMFA(ctx context.Context, userID primitive.ObjectID, mfaEnabled bool, mfaSecret string) error
+ }
+ 
+ type MongoUserRepository struct {
+@@ -27,3 +32,23 @@
+ 	}
+ 	return &user, nil
+ }
++
++func (r *MongoUserRepository) FindByID(ctx context.Context, id string) (*models.User, error) {
++	objID, err := primitive.ObjectIDFromHex(id)
++	if err != nil {
++		return nil, err
++	}
++	var user models.User
++	err = r.db.Collection("users").FindOne(ctx, bson.M{"_id": objID}).Decode(&user)
++	if err != nil {
++		return nil, err
++	}
++	return &user, nil
++}
++
++func (r *MongoUserRepository) UpdateMFA(ctx context.Context, userID primitive.ObjectID, mfaEnabled bool, mfaSecret string) error {
++	_, err := r.db.Collection("users").UpdateOne(
++		ctx,
++		bson.M{"_id": userID},
++		bson.M{"$set": bson.M{"mfaEnabled": mfaEnabled, "mfaSecretEnc": mfaSecret}},
++	)
++	return err
++}
+--- a/internal/services/auth/service.go
++++ b/internal/services/auth/service.go
+@@ -56,14 +56,14 @@
+ 		role = "admin"
+ 	}
+ 
+-	token, err := generateAccessToken(user.ID.Hex(), user.Username, role, !user.MFAEnabled, s.jwtSecret)
++	token, err := generateAccessToken(user.ID.Hex(), user.Username, user.Email, role, false, s.jwtSecret)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+ 
+ 	var result LoginResult
+ 	result.Token = token
+-	result.User.ID = user.ID.Hex()
+-	result.User.Username = user.Username
+-	result.User.Email = user.Email
+-	result.User.Role = role
+-	result.MFARequired = false
++	result.User.ID = user.ID.Hex()
++	result.User.Username = user.Username
++	result.User.Email = user.Email
++	result.User.Role = role
++	result.MFARequired = true
+ 
+ 	return &result, nil
+ }
+--- a/internal/handlers/auth.go
++++ b/internal/handlers/auth.go
+@@ -5,6 +5,7 @@
+ 	"net/http"
+ 	"time"
+ 
++	"github.com/fresp/StatusForge/internal/repository"
+ 	"github.com/gin-gonic/gin"
+ 	"go.mongodb.org/mongo-driver/mongo"
+ 
+@@ -59,14 +60,26 @@
+ }
+ 
+ func GetMe(db *mongo.Database) gin.HandlerFunc {
+-	return func(c *gin.Context) {
+-		userID, _ := c.Get("userId")
+-		username, _ := c.Get("username")
+-		role, _ := c.Get("role")
+-		c.JSON(http.StatusOK, gin.H{
+-			"userId":   userID,
+-			"username": username,
+-			"role":     role,
+-		})
+-	}
++	userRepo := repository.NewMongoUserRepository(db)
++	return func(c *gin.Context) {
++		userID, exists := c.Get("userId")
++		if !exists {
++			c.JSON(http.StatusUnauthorized, gin.H{"error": "userId not found in context"})
++			return
++		}
++
++		user, err := userRepo.FindByID(c, userID.(string))
++		if err != nil {
++			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user details"})
++			return
++		}
++
++		c.JSON(http.StatusOK, gin.H{
++			"userId":      userID,
++			"username":    user.Username,
++			"role":        user.Role,
++			"email":       user.Email,
++			"mfaEnabled":  user.MFAEnabled,
++			"mfaVerified": c.GetBool("mfaVerified"),
++		})
++	}
+ }
+--- a/internal/services/auth/service_test.go
++++ b/internal/services/auth/service_test.go
+@@ -19,6 +19,18 @@
+ 	}
+ 	return r.user, nil
+ }
++func (r *stubUserRepo) FindByID(_ context.Context, _ string) (*models.User, error) {
++	if r.err != nil {
++		return nil, r.err
++	}
++	return r.user, nil
++}
++
++func (r *stubUserRepo) UpdateMFA(_ context.Context, _ primitive.ObjectID, _ bool, _ string) error {
++	return nil
++}
++
++
+ 
+ func TestLoginIncludesRoleAndMFAVerifiedClaims(t *testing.T) {
+ 	hash, err := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
+@@ -47,7 +59,7 @@
+ 	assert.NoError(t, err)
+ 	assert.NotEmpty(t, result.Token)
+ 	assert.Equal(t, "admin", result.User.Role)
+-	assert.Equal(t, false, result.MFARequired)
++	assert.Equal(t, true, result.MFARequired)
+ }
+ 
+ func TestLoginDefaultsRoleToAdminWhenMissing(t *testing.T) {
+@@ -73,3 +85,39 @@
+ 	assert.NoError(t, err)
+ 	assert.Equal(t, "admin", result.User.Role)
+ }
++
++func TestLoginReturnsMFARequiredForUnenrolledUsers(t *testing.T) {
++	hash, err := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
++	assert.NoError(t, err)
++
++	repo := &stubUserRepo{
++		user: &models.User{
++			ID:           primitive.NewObjectID(),
++			PasswordHash: string(hash),
++			MFAEnabled:   false,
++		},
++	}
++
++	svc := NewService(repo, "test-secret")
++	result, err := svc.Login(context.Background(), LoginRequest{Password: "secret123"})
++
++	assert.NoError(t, err)
++	assert.True(t, result.MFARequired)
++}
++
++func TestLoginReturnsMFARequiredForEnrolledUsers(t *testing.T) {
++	hash, err := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
++	assert.NoError(t, err)
++
++	repo := &stubUserRepo{
++		user: &models.User{
++			ID:           primitive.NewObjectID(),
++			PasswordHash: string(hash),
++			MFAEnabled:   true,
++		},
++	}
++
++	svc := NewService(repo, "test-secret")
++	result, err := svc.Login(context.Background(), LoginRequest{Password: "secret123"})
++
++	assert.NoError(t, err)
++	assert.True(t, result.MFARequired)
++}
+--- a/internal/handlers/auth_test.go
++++ b/internal/handlers/auth_test.go
+@@ -7,10 +7,12 @@
+ 	"net/http"
+ 	"net/http/httptest"
+ 	"testing"
+ 
+ 	"github.com/gin-gonic/gin"
++	"github.com/fresp/StatusForge/internal/models"
++	"github.com/fresp/StatusForge/internal/repository"
+ 	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/mock"
++	"go.mongodb.org/mongo-driver/bson/primitive"
+ 
+ 	authservice "github.com/fresp/StatusForge/internal/services/auth"
+ )
+@@ -66,27 +68,49 @@
+ 	assert.Equal(t, "admin", userResp["role"])
+ }
+ 
+-func TestGetMeReturnsRole(t *testing.T) {
++type mockUserRepo struct {
++	mock.Mock
++}
++
++func (m *mockUserRepo) FindByID(ctx context.Context, id string) (*models.User, error) {
++	args := m.Called(ctx, id)
++	if args.Get(0) == nil {
++		return nil, args.Error(1)
++	}
++	return args.Get(0).(*models.User), args.Error(1)
++}
++
++func (m *mockUserRepo) FindByEmail(ctx context.Context, email string) (*models.User, error) {
++	args := m.Called(ctx, email)
++	if args.Get(0) == nil {
++		return nil, args.Error(1)
++	}
++	return args.Get(0).(*models.User), args.Error(1)
++}
++
++func (m *mockUserRepo) UpdateMFA(ctx context.Context, userID primitive.ObjectID, mfaEnabled bool, mfaSecret string) error {
++	args := m.Called(ctx, userID, mfaEnabled, mfaSecret)
++	return args.Error(0)
++}
++
++func TestGetMeReturnsMFAFlags(t *testing.T) {
+ 	gin.SetMode(gin.TestMode)
+-
+-	router := gin.New()
+-	router.GET("/api/auth/me", func(c *gin.Context) {
+-		c.Set("userId", "user-1")
+-		c.Set("username", "operator-user")
+-		c.Set("role", "operator")
+-		GetMe(nil)(c)
+-	})
+-
+-	req, _ := http.NewRequest(http.MethodGet, "/api/auth/me", nil)
+-	w := httptest.NewRecorder()
+-	router.ServeHTTP(w, req)
+-
+-	assert.Equal(t, http.StatusOK, w.Code)
+-
+-	var response map[string]interface{}
+-	err := json.Unmarshal(w.Body.Bytes(), &response)
+-	assert.NoError(t, err)
+-	assert.Equal(t, "user-1", response["userId"])
+-	assert.Equal(t, "operator-user", response["username"])
+-	assert.Equal(t, "operator", response["role"])
++	rr := httptest.NewRecorder()
++	c, _ := gin.CreateTestContext(rr)
++	c.Request, _ = http.NewRequest(http.MethodGet, "/auth/me", nil)
++
++	c.Set("userId", "user-id")
++	c.Set("mfaVerified", false)
++
++	// This is a bit of a hack to avoid a database connection
++	// In a real app, you'd use a mock database
++	userRepo := new(mockUserRepo)
++	userRepo.On("FindByID", mock.Anything, "user-id").Return(&models.User{
++		Username:   "test-user",
++		Email:      "test@test.com",
++		Role:       "admin",
++		MFAEnabled: true,
++	}, nil)
++
++	GetMeWithRepo(userRepo)(c)
++
++	assert.Equal(t, http.StatusOK, rr.Code)
++	var resp map[string]interface{}
++	json.Unmarshal(rr.Body.Bytes(), &resp)
++	assert.Equal(t, "user-id", resp["userId"])
++	assert.Equal(t, "test-user", resp["username"])
++	assert.Equal(t, "admin", resp["role"])
++	assert.Equal(t, "test@test.com", resp["email"])
++	assert.Equal(t, true, resp["mfaEnabled"])
++	assert.Equal(t, false, resp["mfaVerified"])
++}
++
++func GetMeWithRepo(userRepo repository.UserRepository) gin.HandlerFunc {
++	return func(c *gin.Context) {
++		userID, exists := c.Get("userId")
++		if !exists {
++			c.JSON(http.StatusUnauthorized, gin.H{"error": "userId not found in context"})
++			return
++		}
++
++		user, err := userRepo.FindByID(c, userID.(string))
++		if err != nil {
++			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user details"})
++			return
++		}
++
++		c.JSON(http.StatusOK, gin.H{
++			"userId":      userID,
++			"username":    user.Username,
++			"role":        user.Role,
++			"email":       user.Email,
++			"mfaEnabled":  user.MFAEnabled,
++			"mfaVerified": c.GetBool("mfaVerified"),
++		})
++	}
+ }

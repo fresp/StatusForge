@@ -47,10 +47,13 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 
 	auth.GET("/auth/me", handlers.GetMe(database.GetDB()))
 
-	adminOnly := auth.Group("")
+	mfaProtected := auth.Group("")
+	mfaProtected.Use(middleware.RequireMFA())
+
+	adminOnly := mfaProtected.Group("")
 	adminOnly.Use(middleware.RequireRoles("admin"))
 
-	incidentAndMaintenance := auth.Group("")
+	incidentAndMaintenance := mfaProtected.Group("")
 	incidentAndMaintenance.Use(middleware.RequireRoles("admin", "operator"))
 
 	incidentAndMaintenance.GET("/incidents", handlers.GetIncidents(database.GetDB()))
