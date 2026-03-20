@@ -12,15 +12,15 @@ import {
   LogOut,
   ExternalLink,
 } from 'lucide-react'
-import type { AdminRole } from '../../types'
+import type { UserRole } from '../../types'
 
 interface StoredAdminProfile {
-  role?: AdminRole
+  role?: UserRole
 }
 
-function readStoredRole(): AdminRole | null {
+function readStoredRole(): UserRole | null {
   try {
-    const raw = localStorage.getItem('admin_profile')
+    const raw = localStorage.getItem('user_profile') || localStorage.getItem('admin_profile')
     if (!raw) return null
     const parsed = JSON.parse(raw) as StoredAdminProfile
     return parsed.role ?? null
@@ -37,7 +37,7 @@ const navItems = [
   { to: '/admin/maintenance', label: 'Maintenance', icon: Wrench, end: false },
   { to: '/admin/monitors', label: 'Monitors', icon: Activity, end: false },
   { to: '/admin/subscribers', label: 'Subscribers', icon: Users, end: false },
-  { to: '/admin/members', label: 'Members', icon: Shield, end: false },
+  { to: '/admin/users', label: 'Users', icon: Shield, end: false },
 ]
 
 const OPERATOR_ALLOWED = new Set(['/admin/incidents', '/admin/maintenance'])
@@ -48,6 +48,8 @@ export default function AdminLayout() {
   const visibleNavItems = role === 'operator' ? navItems.filter(item => OPERATOR_ALLOWED.has(item.to)) : navItems
 
   function handleLogout() {
+    localStorage.removeItem('user_token')
+    localStorage.removeItem('user_profile')
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin_profile')
     navigate('/admin/login')
@@ -59,7 +61,7 @@ export default function AdminLayout() {
       <aside className="w-60 bg-gray-900 text-white flex flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-gray-700">
           <h1 className="text-lg font-bold">Status Platform</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Admin Console</p>
+          <p className="text-xs text-gray-400 mt-0.5">User Console</p>
         </div>
 
         <nav className="flex-1 py-4 space-y-0.5 px-3">

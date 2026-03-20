@@ -15,9 +15,9 @@ export default function AdminLogin() {
     setLoading(true)
     try {
       const res = await api.post('/auth/login', { email, password })
-      localStorage.setItem('admin_token', res.data.token)
-      if (res.data?.admin) {
-        localStorage.setItem('admin_profile', JSON.stringify(res.data.admin))
+      localStorage.setItem('user_token', res.data.token)
+      if (res.data?.user) {
+        localStorage.setItem('user_profile', JSON.stringify(res.data.user))
       }
       navigate('/admin')
     } catch (err: any) {
@@ -30,7 +30,7 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white rounded-xl shadow-md w-full max-w-sm p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Login</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">User Login</h1>
         <p className="text-sm text-gray-500 mb-6">Status Platform</p>
 
         {error && (

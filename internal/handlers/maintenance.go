@@ -63,21 +63,21 @@ func CreateMaintenance(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		rawAdminID, exists := c.Get("adminId")
+		rawUserID, exists := c.Get("userId")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authenticated admin context"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authenticated user context"})
 			return
 		}
 
-		adminIDHex, ok := rawAdminID.(string)
+		userIDHex, ok := rawUserID.(string)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated admin context"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user context"})
 			return
 		}
 
-		adminID, err := primitive.ObjectIDFromHex(adminIDHex)
+		userID, err := primitive.ObjectIDFromHex(userIDHex)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated admin id"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user id"})
 			return
 		}
 
@@ -104,7 +104,7 @@ func CreateMaintenance(db *mongo.Database) gin.HandlerFunc {
 			ID:              primitive.NewObjectID(),
 			Title:           req.Title,
 			Description:     req.Description,
-			CreatorID:       &adminID,
+			CreatorID:       &userID,
 			CreatorUsername: creatorName,
 			Components:      compIDs,
 			StartTime:       startTime,

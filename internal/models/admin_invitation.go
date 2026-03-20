@@ -6,7 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type AdminInvitation struct {
+type UserInvitation struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	TokenHash  string             `bson:"tokenHash" json:"-"`
 	Email      string             `bson:"email" json:"email"`

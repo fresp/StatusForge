@@ -23,7 +23,7 @@ func TestAdminOnlyRoutesForbidOperatorRole(t *testing.T) {
 	RegisterAPIRoutes(router, hub, cfg)
 
 	token, err := middleware.GenerateTokenWithClaims(middleware.TokenClaimsInput{
-		AdminID:     "operator-id",
+		UserID:      "operator-id",
 		Username:    "operator-user",
 		Role:        "operator",
 		MFAVerified: true,
@@ -52,12 +52,12 @@ func TestAdminOnlyRoutesForbidOperatorRole(t *testing.T) {
 		{name: "GET /api/monitors/outages", method: http.MethodGet, path: "/api/monitors/outages"},
 		{name: "GET /api/subscribers", method: http.MethodGet, path: "/api/subscribers"},
 		{name: "DELETE /api/subscribers/:id", method: http.MethodDelete, path: "/api/subscribers/507f1f77bcf86cd799439011"},
-		{name: "GET /api/admins", method: http.MethodGet, path: "/api/admins"},
-		{name: "PATCH /api/admins/:id", method: http.MethodPatch, path: "/api/admins/507f1f77bcf86cd799439011"},
-		{name: "POST /api/admins/invitations", method: http.MethodPost, path: "/api/admins/invitations"},
-		{name: "GET /api/admins/invitations", method: http.MethodGet, path: "/api/admins/invitations"},
-		{name: "POST /api/admins/invitations/:id/refresh", method: http.MethodPost, path: "/api/admins/invitations/507f1f77bcf86cd799439011/refresh"},
-		{name: "DELETE /api/admins/invitations/:id", method: http.MethodDelete, path: "/api/admins/invitations/507f1f77bcf86cd799439011"},
+		{name: "GET /api/users", method: http.MethodGet, path: "/api/users"},
+		{name: "PATCH /api/users/:id", method: http.MethodPatch, path: "/api/users/507f1f77bcf86cd799439011"},
+		{name: "POST /api/users/invitations", method: http.MethodPost, path: "/api/users/invitations"},
+		{name: "GET /api/users/invitations", method: http.MethodGet, path: "/api/users/invitations"},
+		{name: "POST /api/users/invitations/:id/refresh", method: http.MethodPost, path: "/api/users/invitations/507f1f77bcf86cd799439011/refresh"},
+		{name: "DELETE /api/users/invitations/:id", method: http.MethodDelete, path: "/api/users/invitations/507f1f77bcf86cd799439011"},
 	}
 
 	for _, route := range adminOnlyRoutes {

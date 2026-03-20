@@ -7,16 +7,16 @@ import (
 )
 
 type tokenClaims struct {
-	AdminID     string `json:"adminId"`
+	UserID      string `json:"userId"`
 	Username    string `json:"username"`
 	Role        string `json:"role,omitempty"`
 	MFAVerified bool   `json:"mfaVerified,omitempty"`
 	jwt.RegisteredClaims
 }
 
-func generateAccessToken(adminID, username, role string, mfaVerified bool, secret string) (string, error) {
+func generateAccessToken(userID, username, role string, mfaVerified bool, secret string) (string, error) {
 	claims := &tokenClaims{
-		AdminID:     adminID,
+		UserID:      userID,
 		Username:    username,
 		Role:        role,
 		MFAVerified: mfaVerified,

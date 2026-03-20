@@ -15,29 +15,29 @@ import (
 	"github.com/fresp/StatusForge/internal/models"
 )
 
-func TestMapAdminToMemberDefaults(t *testing.T) {
-	admin := models.Admin{
+func TestMapUserDefaults(t *testing.T) {
+	user := models.User{
 		ID:       primitive.NewObjectID(),
 		Username: "admin",
 		Email:    "admin@example.com",
 	}
 
-	mapped := mapAdminToMember(admin)
+	mapped := mapUser(user)
 
-	assert.Equal(t, admin.ID.Hex(), mapped.ID)
+	assert.Equal(t, user.ID.Hex(), mapped.ID)
 	assert.Equal(t, "admin", mapped.Username)
 	assert.Equal(t, "admin@example.com", mapped.Email)
 	assert.Equal(t, "admin", mapped.Role)
 	assert.Equal(t, "active", mapped.Status)
 }
 
-func TestPatchAdminRejectsInvalidID(t *testing.T) {
+func TestPatchUserRejectsInvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.PATCH("/api/admins/:id", PatchAdmin(nil))
+	r.PATCH("/api/users/:id", PatchUser(nil))
 
 	body, _ := json.Marshal(map[string]string{"role": "admin"})
-	req, _ := http.NewRequest(http.MethodPatch, "/api/admins/not-an-object-id", bytes.NewBuffer(body))
+	req, _ := http.NewRequest(http.MethodPatch, "/api/users/not-an-object-id", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -46,17 +46,17 @@ func TestPatchAdminRejectsInvalidID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestCreateAdminInvitationRejectsInvalidRoleBeforeDBAccess(t *testing.T) {
+func TestCreateUserInvitationRejectsInvalidRoleBeforeDBAccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.POST("/api/admins/invitations", CreateAdminInvitation(nil))
+	r.POST("/api/users/invitations", CreateUserInvitation(nil))
 
 	body, _ := json.Marshal(map[string]string{
 		"email": "member@example.com",
 		"role":  "superadmin",
 	})
 
-	req, _ := http.NewRequest(http.MethodPost, "/api/admins/invitations", bytes.NewBuffer(body))
+	req, _ := http.NewRequest(http.MethodPost, "/api/users/invitations", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -65,10 +65,10 @@ func TestCreateAdminInvitationRejectsInvalidRoleBeforeDBAccess(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestActivateAdminInvitationRejectsInvalidPayloadBeforeDBAccess(t *testing.T) {
+func TestActivateUserInvitationRejectsInvalidPayloadBeforeDBAccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.POST("/api/admins/invitations/activate", ActivateAdminInvitation(nil))
+	r.POST("/api/users/invitations/activate", ActivateUserInvitation(nil))
 
 	body, _ := json.Marshal(map[string]string{
 		"token":    "",
@@ -76,7 +76,7 @@ func TestActivateAdminInvitationRejectsInvalidPayloadBeforeDBAccess(t *testing.T
 		"password": "short",
 	})
 
-	req, _ := http.NewRequest(http.MethodPost, "/api/admins/invitations/activate", bytes.NewBuffer(body))
+	req, _ := http.NewRequest(http.MethodPost, "/api/users/invitations/activate", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -85,10 +85,10 @@ func TestActivateAdminInvitationRejectsInvalidPayloadBeforeDBAccess(t *testing.T
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestActivateAdminInvitationRejectsBlankTokenAfterTrim(t *testing.T) {
+func TestActivateUserInvitationRejectsBlankTokenAfterTrim(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.POST("/api/admins/invitations/activate", ActivateAdminInvitation(nil))
+	r.POST("/api/users/invitations/activate", ActivateUserInvitation(nil))
 
 	body, _ := json.Marshal(map[string]string{
 		"token":    "   ",
@@ -96,7 +96,7 @@ func TestActivateAdminInvitationRejectsBlankTokenAfterTrim(t *testing.T) {
 		"password": "password123",
 	})
 
-	req, _ := http.NewRequest(http.MethodPost, "/api/admins/invitations/activate", bytes.NewBuffer(body))
+	req, _ := http.NewRequest(http.MethodPost, "/api/users/invitations/activate", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -110,7 +110,7 @@ func TestBuildActivationLinkUsesCurrentHostAndToken(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	req, _ := http.NewRequest(http.MethodGet, "http://localhost:18081/api/admins/invitations", nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost:18081/api/users/invitations", nil)
 	req.Host = "localhost:18081"
 	c.Request = req
 
@@ -118,9 +118,9 @@ func TestBuildActivationLinkUsesCurrentHostAndToken(t *testing.T) {
 	assert.Equal(t, "http://localhost:18081/admin/activate?token=abc123", link)
 }
 
-func TestGetAdminInvitationsMapsInvitationModel(t *testing.T) {
+func TestGetUserInvitationsMapsInvitationModel(t *testing.T) {
 	now := time.Now()
-	inv := models.AdminInvitation{
+	inv := models.UserInvitation{
 		ID:        primitive.NewObjectID(),
 		Email:     "invited@example.com",
 		Role:      "operator",
@@ -128,7 +128,7 @@ func TestGetAdminInvitationsMapsInvitationModel(t *testing.T) {
 		CreatedAt: now,
 	}
 
-	resp := adminInvitationResponse{
+	resp := userInvitationResponse{
 		ID:        inv.ID.Hex(),
 		Email:     inv.Email,
 		Role:      inv.Role,
@@ -145,12 +145,12 @@ func TestGetAdminInvitationsMapsInvitationModel(t *testing.T) {
 	assert.False(t, resp.IsExpired)
 }
 
-func TestDeleteAdminRejectsInvalidID(t *testing.T) {
+func TestDeleteUserRejectsInvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.DELETE("/api/admins/:id", DeleteAdmin(nil))
+	r.DELETE("/api/users/:id", DeleteUser(nil))
 
-	req, _ := http.NewRequest(http.MethodDelete, "/api/admins/not-an-object-id", nil)
+	req, _ := http.NewRequest(http.MethodDelete, "/api/users/not-an-object-id", nil)
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -158,16 +158,16 @@ func TestDeleteAdminRejectsInvalidID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestDeleteAdminRejectsSelfDelete(t *testing.T) {
+func TestDeleteUserRejectsSelfDelete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
-		c.Set("adminId", "507f1f77bcf86cd799439011")
+		c.Set("userId", "507f1f77bcf86cd799439011")
 		c.Next()
 	})
-	r.DELETE("/api/admins/:id", DeleteAdmin(nil))
+	r.DELETE("/api/users/:id", DeleteUser(nil))
 
-	req, _ := http.NewRequest(http.MethodDelete, "/api/admins/507f1f77bcf86cd799439011", nil)
+	req, _ := http.NewRequest(http.MethodDelete, "/api/users/507f1f77bcf86cd799439011", nil)
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)

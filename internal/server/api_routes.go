@@ -40,7 +40,7 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 	api.POST("/subscribe", handlers.Subscribe(database.GetDB()))
 
 	api.POST("/auth/login", handlers.Login(database.GetDB(), cfg.JWTSecret))
-	api.POST("/admins/invitations/activate", handlers.ActivateAdminInvitation(database.GetDB()))
+	api.POST("/users/invitations/activate", handlers.ActivateUserInvitation(database.GetDB()))
 
 	auth := api.Group("")
 	auth.Use(middleware.AuthMiddleware(cfg.JWTSecret))
@@ -87,21 +87,21 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 	adminOnly.GET("/subscribers", handlers.GetSubscribers(database.GetDB()))
 	adminOnly.DELETE("/subscribers/:id", handlers.DeleteSubscriber(database.GetDB()))
 
-	adminOnly.GET("/admins", handlers.GetAdmins(database.GetDB()))
-	adminOnly.PATCH("/admins/:id", handlers.PatchAdmin(database.GetDB()))
-	adminOnly.DELETE("/admins/:id", handlers.DeleteAdmin(database.GetDB()))
-	adminOnly.POST("/admins/invitations", handlers.CreateAdminInvitation(database.GetDB()))
-	adminOnly.GET("/admins/invitations", handlers.GetAdminInvitations(database.GetDB()))
-	adminOnly.POST("/admins/invitations/:id/refresh", handlers.RefreshAdminInvitation(database.GetDB()))
-	adminOnly.DELETE("/admins/invitations/:id", handlers.RevokeAdminInvitation(database.GetDB()))
+	adminOnly.GET("/users", handlers.GetUsers(database.GetDB()))
+	adminOnly.PATCH("/users/:id", handlers.PatchUser(database.GetDB()))
+	adminOnly.DELETE("/users/:id", handlers.DeleteUser(database.GetDB()))
+	adminOnly.POST("/users/invitations", handlers.CreateUserInvitation(database.GetDB()))
+	adminOnly.GET("/users/invitations", handlers.GetUserInvitations(database.GetDB()))
+	adminOnly.POST("/users/invitations/:id/refresh", handlers.RefreshUserInvitation(database.GetDB()))
+	adminOnly.DELETE("/users/invitations/:id", handlers.RevokeUserInvitation(database.GetDB()))
 }
 
 func SeedAdmin(db *mongo.Database, cfg *configs.Config) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var existing models.Admin
-	if err := db.Collection("admins").FindOne(ctx, bson.M{"email": cfg.AdminEmail}).Decode(&existing); err == nil {
+	var existing models.User
+	if err := db.Collection("users").FindOne(ctx, bson.M{"email": cfg.AdminEmail}).Decode(&existing); err == nil {
 		return
 	}
 
@@ -111,7 +111,7 @@ func SeedAdmin(db *mongo.Database, cfg *configs.Config) {
 		return
 	}
 
-	admin := models.Admin{
+	user := models.User{
 		ID:           primitive.NewObjectID(),
 		Username:     cfg.AdminUser,
 		Email:        cfg.AdminEmail,
@@ -121,7 +121,7 @@ func SeedAdmin(db *mongo.Database, cfg *configs.Config) {
 		CreatedAt:    time.Now(),
 	}
 
-	if _, err := db.Collection("admins").InsertOne(ctx, admin); err != nil {
+	if _, err := db.Collection("users").InsertOne(ctx, user); err != nil {
 		log.Printf("[HTTP] Failed to seed admin: %v", err)
 		return
 	}

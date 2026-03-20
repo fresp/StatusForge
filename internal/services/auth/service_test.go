@@ -11,24 +11,24 @@ import (
 	"github.com/fresp/StatusForge/internal/models"
 )
 
-type stubAdminRepo struct {
-	admin *models.Admin
-	err   error
+type stubUserRepo struct {
+	user *models.User
+	err  error
 }
 
-func (r *stubAdminRepo) FindByEmail(_ context.Context, _ string) (*models.Admin, error) {
+func (r *stubUserRepo) FindByEmail(_ context.Context, _ string) (*models.User, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return r.admin, nil
+	return r.user, nil
 }
 
 func TestLoginIncludesRoleAndMFAVerifiedClaims(t *testing.T) {
 	hash, err := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
 	assert.NoError(t, err)
 
-	repo := &stubAdminRepo{
-		admin: &models.Admin{
+	repo := &stubUserRepo{
+		user: &models.User{
 			ID:           primitive.NewObjectID(),
 			Username:     "admin",
 			Email:        "admin@example.com",
@@ -43,7 +43,7 @@ func TestLoginIncludesRoleAndMFAVerifiedClaims(t *testing.T) {
 	result, err := svc.Login(context.Background(), LoginRequest{Email: "admin@example.com", Password: "secret123"})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, result.Token)
-	assert.Equal(t, "admin", result.Admin.Role)
+	assert.Equal(t, "admin", result.User.Role)
 	assert.Equal(t, false, result.MFARequired)
 }
 
@@ -51,8 +51,8 @@ func TestLoginDefaultsRoleToAdminWhenMissing(t *testing.T) {
 	hash, err := bcrypt.GenerateFromPassword([]byte("secret123"), bcrypt.DefaultCost)
 	assert.NoError(t, err)
 
-	repo := &stubAdminRepo{
-		admin: &models.Admin{
+	repo := &stubUserRepo{
+		user: &models.User{
 			ID:           primitive.NewObjectID(),
 			Username:     "legacy",
 			Email:        "legacy@example.com",
@@ -66,5 +66,5 @@ func TestLoginDefaultsRoleToAdminWhenMissing(t *testing.T) {
 
 	result, err := svc.Login(context.Background(), LoginRequest{Email: "legacy@example.com", Password: "secret123"})
 	assert.NoError(t, err)
-	assert.Equal(t, "admin", result.Admin.Role)
+	assert.Equal(t, "admin", result.User.Role)
 }

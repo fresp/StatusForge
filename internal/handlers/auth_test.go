@@ -33,10 +33,10 @@ func TestLoginHandlerReturnsExtendedContract(t *testing.T) {
 		Token:       "token-123",
 		MFARequired: false,
 	}
-	result.Admin.ID = "abc"
-	result.Admin.Username = "admin"
-	result.Admin.Email = "admin@example.com"
-	result.Admin.Role = "admin"
+	result.User.ID = "abc"
+	result.User.Username = "admin"
+	result.User.Email = "admin@example.com"
+	result.User.Role = "admin"
 
 	router := gin.New()
 	router.POST("/api/auth/login", loginWithService(&stubLoginService{result: result}))
@@ -60,9 +60,9 @@ func TestLoginHandlerReturnsExtendedContract(t *testing.T) {
 	assert.Equal(t, "token-123", response["token"])
 	assert.Equal(t, false, response["mfaRequired"])
 
-	adminResp, ok := response["admin"].(map[string]interface{})
+	userResp, ok := response["user"].(map[string]interface{})
 	assert.True(t, ok)
-	assert.Equal(t, "admin", adminResp["role"])
+	assert.Equal(t, "admin", userResp["role"])
 }
 
 func TestGetMeReturnsRole(t *testing.T) {
@@ -70,7 +70,7 @@ func TestGetMeReturnsRole(t *testing.T) {
 
 	router := gin.New()
 	router.GET("/api/auth/me", func(c *gin.Context) {
-		c.Set("adminId", "admin-1")
+		c.Set("userId", "user-1")
 		c.Set("username", "operator-user")
 		c.Set("role", "operator")
 		GetMe(nil)(c)
@@ -85,7 +85,7 @@ func TestGetMeReturnsRole(t *testing.T) {
 	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, "admin-1", response["adminId"])
+	assert.Equal(t, "user-1", response["userId"])
 	assert.Equal(t, "operator-user", response["username"])
 	assert.Equal(t, "operator", response["role"])
 }

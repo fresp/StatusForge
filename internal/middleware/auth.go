@@ -10,7 +10,7 @@ import (
 )
 
 type Claims struct {
-	AdminID     string `json:"adminId"`
+	UserID      string `json:"userId"`
 	Username    string `json:"username"`
 	Role        string `json:"role,omitempty"`
 	MFAVerified bool   `json:"mfaVerified,omitempty"`
@@ -18,7 +18,7 @@ type Claims struct {
 }
 
 type TokenClaimsInput struct {
-	AdminID     string
+	UserID      string
 	Username    string
 	Role        string
 	MFAVerified bool
@@ -55,7 +55,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("adminId", claims.AdminID)
+		c.Set("userId", claims.UserID)
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 		c.Set("mfaVerified", claims.MFAVerified)
@@ -95,9 +95,9 @@ func RequireRoles(allowedRoles ...string) gin.HandlerFunc {
 	}
 }
 
-func GenerateToken(adminID, username, secret string) (string, error) {
+func GenerateToken(userID, username, secret string) (string, error) {
 	return GenerateTokenWithClaims(TokenClaimsInput{
-		AdminID:     adminID,
+		UserID:      userID,
 		Username:    username,
 		Role:        "",
 		MFAVerified: true,
@@ -108,7 +108,7 @@ func GenerateToken(adminID, username, secret string) (string, error) {
 
 func GenerateTokenWithClaims(input TokenClaimsInput) (string, error) {
 	claims := &Claims{
-		AdminID:     input.AdminID,
+		UserID:      input.UserID,
 		Username:    input.Username,
 		Role:        input.Role,
 		MFAVerified: input.MFAVerified,

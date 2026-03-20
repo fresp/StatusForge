@@ -19,18 +19,18 @@ import (
 	"github.com/fresp/StatusForge/internal/models"
 )
 
-var allowedAdminRoles = map[string]struct{}{
+var allowedUserRoles = map[string]struct{}{
 	"admin":    {},
 	"operator": {},
 }
 
-var allowedAdminStatuses = map[string]struct{}{
+var allowedUserStatuses = map[string]struct{}{
 	"active":   {},
 	"disabled": {},
 	"invited":  {},
 }
 
-type adminMemberResponse struct {
+type userResponse struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -38,7 +38,7 @@ type adminMemberResponse struct {
 	Status   string `json:"status"`
 }
 
-type adminInvitationResponse struct {
+type userInvitationResponse struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
 	Role      string    `json:"role"`
@@ -47,58 +47,58 @@ type adminInvitationResponse struct {
 	IsExpired bool      `json:"isExpired"`
 }
 
-func mapAdminToMember(admin models.Admin) adminMemberResponse {
-	role := admin.Role
+func mapUser(user models.User) userResponse {
+	role := user.Role
 	if role == "" {
 		role = "admin"
 	}
 
-	status := admin.Status
+	status := user.Status
 	if status == "" {
 		status = "active"
 	}
 
-	return adminMemberResponse{
-		ID:       admin.ID.Hex(),
-		Username: admin.Username,
-		Email:    admin.Email,
+	return userResponse{
+		ID:       user.ID.Hex(),
+		Username: user.Username,
+		Email:    user.Email,
 		Role:     role,
 		Status:   status,
 	}
 }
 
-func GetAdmins(db *mongo.Database) gin.HandlerFunc {
+func GetUsers(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		cursor, err := db.Collection("admins").Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}))
+		cursor, err := db.Collection("users").Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "createdAt", Value: 1}}))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		defer cursor.Close(ctx)
 
-		var admins []models.Admin
-		if err := cursor.All(ctx, &admins); err != nil {
+		var users []models.User
+		if err := cursor.All(ctx, &users); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		members := make([]adminMemberResponse, 0, len(admins))
-		for _, admin := range admins {
-			members = append(members, mapAdminToMember(admin))
+		items := make([]userResponse, 0, len(users))
+		for _, user := range users {
+			items = append(items, mapUser(user))
 		}
 
-		if members == nil {
-			members = []adminMemberResponse{}
+		if items == nil {
+			items = []userResponse{}
 		}
 
-		c.JSON(http.StatusOK, members)
+		c.JSON(http.StatusOK, items)
 	}
 }
 
-func PatchAdmin(db *mongo.Database) gin.HandlerFunc {
+func PatchUser(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := primitive.ObjectIDFromHex(c.Param("id"))
 		if err != nil {
@@ -119,7 +119,7 @@ func PatchAdmin(db *mongo.Database) gin.HandlerFunc {
 		set := bson.M{"updatedAt": time.Now()}
 
 		if req.Role != "" {
-			if _, ok := allowedAdminRoles[req.Role]; !ok {
+			if _, ok := allowedUserRoles[req.Role]; !ok {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
 				return
 			}
@@ -127,7 +127,7 @@ func PatchAdmin(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		if req.Status != "" {
-			if _, ok := allowedAdminStatuses[req.Status]; !ok {
+			if _, ok := allowedUserStatuses[req.Status]; !ok {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status"})
 				return
 			}
@@ -142,8 +142,8 @@ func PatchAdmin(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		var updated models.Admin
-		err = db.Collection("admins").FindOneAndUpdate(
+		var updated models.User
+		err = db.Collection("users").FindOneAndUpdate(
 			ctx,
 			bson.M{"_id": id},
 			bson.M{"$set": set},
@@ -151,7 +151,7 @@ func PatchAdmin(db *mongo.Database) gin.HandlerFunc {
 		).Decode(&updated)
 
 		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusNotFound, gin.H{"error": "admin not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
 		}
 		if err != nil {
@@ -159,11 +159,11 @@ func PatchAdmin(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, mapAdminToMember(updated))
+		c.JSON(http.StatusOK, mapUser(updated))
 	}
 }
 
-func DeleteAdmin(db *mongo.Database) gin.HandlerFunc {
+func DeleteUser(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := primitive.ObjectIDFromHex(c.Param("id"))
 		if err != nil {
@@ -171,25 +171,25 @@ func DeleteAdmin(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		rawAdminID, exists := c.Get("adminId")
+		rawUserID, exists := c.Get("userId")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authenticated admin context"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authenticated user context"})
 			return
 		}
 
-		currentAdminIDHex, ok := rawAdminID.(string)
+		currentUserIDHex, ok := rawUserID.(string)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated admin context"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user context"})
 			return
 		}
 
-		currentAdminID, err := primitive.ObjectIDFromHex(currentAdminIDHex)
+		currentUserID, err := primitive.ObjectIDFromHex(currentUserIDHex)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated admin id"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user id"})
 			return
 		}
 
-		if currentAdminID == id {
+		if currentUserID == id {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete your own account"})
 			return
 		}
@@ -197,14 +197,14 @@ func DeleteAdmin(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		result, err := db.Collection("admins").DeleteOne(ctx, bson.M{"_id": id})
+		result, err := db.Collection("users").DeleteOne(ctx, bson.M{"_id": id})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		if result.DeletedCount == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "admin not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
 		}
 
@@ -212,7 +212,7 @@ func DeleteAdmin(db *mongo.Database) gin.HandlerFunc {
 	}
 }
 
-func CreateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
+func CreateUserInvitation(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Email string `json:"email" binding:"required,email"`
@@ -224,18 +224,13 @@ func CreateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		if _, ok := allowedAdminRoles[req.Role]; !ok || req.Role == "admin" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role for invitation"})
-			return
-		}
-
 		email := strings.ToLower(strings.TrimSpace(req.Email))
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if err := db.Collection("admins").FindOne(ctx, bson.M{"email": email}).Err(); err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "admin with this email already exists"})
+		if err := db.Collection("users").FindOne(ctx, bson.M{"email": email}).Err(); err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "user with this email already exists"})
 			return
 		}
 
@@ -249,7 +244,7 @@ func CreateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 		tokenHash := hex.EncodeToString(hash[:])
 
 		createdBy := primitive.NilObjectID
-		if v, ok := c.Get("adminId"); ok {
+		if v, ok := c.Get("userId"); ok {
 			if s, sok := v.(string); sok {
 				if objID, parseErr := primitive.ObjectIDFromHex(s); parseErr == nil {
 					createdBy = objID
@@ -258,7 +253,7 @@ func CreateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		now := time.Now()
-		invitation := models.AdminInvitation{
+		invitation := models.UserInvitation{
 			ID:        primitive.NewObjectID(),
 			TokenHash: tokenHash,
 			Email:     email,
@@ -268,7 +263,7 @@ func CreateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 			CreatedAt: now,
 		}
 
-		if _, err := db.Collection("admin_invitations").InsertOne(ctx, invitation); err != nil {
+		if _, err := db.Collection("user_invitations").InsertOne(ctx, invitation); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -286,12 +281,12 @@ func CreateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 	}
 }
 
-func GetAdminInvitations(db *mongo.Database) gin.HandlerFunc {
+func GetUserInvitations(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		cursor, err := db.Collection("admin_invitations").Find(ctx, bson.M{
+		cursor, err := db.Collection("user_invitations").Find(ctx, bson.M{
 			"acceptedAt": bson.M{"$exists": false},
 			"revokedAt":  bson.M{"$exists": false},
 		}, options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
@@ -301,16 +296,16 @@ func GetAdminInvitations(db *mongo.Database) gin.HandlerFunc {
 		}
 		defer cursor.Close(ctx)
 
-		var invitations []models.AdminInvitation
+		var invitations []models.UserInvitation
 		if err := cursor.All(ctx, &invitations); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		now := time.Now()
-		items := make([]adminInvitationResponse, 0, len(invitations))
+		items := make([]userInvitationResponse, 0, len(invitations))
 		for _, invitation := range invitations {
-			items = append(items, adminInvitationResponse{
+			items = append(items, userInvitationResponse{
 				ID:        invitation.ID.Hex(),
 				Email:     invitation.Email,
 				Role:      invitation.Role,
@@ -321,14 +316,14 @@ func GetAdminInvitations(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		if items == nil {
-			items = []adminInvitationResponse{}
+			items = []userInvitationResponse{}
 		}
 
 		c.JSON(http.StatusOK, items)
 	}
 }
 
-func RefreshAdminInvitation(db *mongo.Database) gin.HandlerFunc {
+func RefreshUserInvitation(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		invitationID, err := primitive.ObjectIDFromHex(c.Param("id"))
 		if err != nil {
@@ -339,8 +334,8 @@ func RefreshAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		var invitation models.AdminInvitation
-		err = db.Collection("admin_invitations").FindOne(ctx, bson.M{
+		var invitation models.UserInvitation
+		err = db.Collection("user_invitations").FindOne(ctx, bson.M{
 			"_id":        invitationID,
 			"acceptedAt": bson.M{"$exists": false},
 			"revokedAt":  bson.M{"$exists": false},
@@ -365,7 +360,7 @@ func RefreshAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 		now := time.Now()
 		expiresAt := now.Add(48 * time.Hour)
 
-		_, err = db.Collection("admin_invitations").UpdateByID(ctx, invitationID, bson.M{"$set": bson.M{
+		_, err = db.Collection("user_invitations").UpdateByID(ctx, invitationID, bson.M{"$set": bson.M{
 			"tokenHash": tokenHash,
 			"expiresAt": expiresAt,
 		}})
@@ -386,7 +381,7 @@ func RefreshAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 	}
 }
 
-func RevokeAdminInvitation(db *mongo.Database) gin.HandlerFunc {
+func RevokeUserInvitation(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		invitationID, err := primitive.ObjectIDFromHex(c.Param("id"))
 		if err != nil {
@@ -398,7 +393,7 @@ func RevokeAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 		defer cancel()
 
 		now := time.Now()
-		result, err := db.Collection("admin_invitations").UpdateOne(ctx, bson.M{
+		result, err := db.Collection("user_invitations").UpdateOne(ctx, bson.M{
 			"_id":        invitationID,
 			"acceptedAt": bson.M{"$exists": false},
 			"revokedAt":  bson.M{"$exists": false},
@@ -416,7 +411,7 @@ func RevokeAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 	}
 }
 
-func ActivateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
+func ActivateUserInvitation(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Token    string `json:"token" binding:"required"`
@@ -442,8 +437,8 @@ func ActivateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		var invitation models.AdminInvitation
-		err := db.Collection("admin_invitations").FindOne(ctx, bson.M{
+		var invitation models.UserInvitation
+		err := db.Collection("user_invitations").FindOne(ctx, bson.M{
 			"tokenHash":  tokenHash,
 			"revokedAt":  bson.M{"$exists": false},
 			"acceptedAt": bson.M{"$exists": false},
@@ -458,8 +453,8 @@ func ActivateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		if err := db.Collection("admins").FindOne(ctx, bson.M{"email": invitation.Email}).Err(); err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "admin with this email already exists"})
+		if err := db.Collection("users").FindOne(ctx, bson.M{"email": invitation.Email}).Err(); err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "user with this email already exists"})
 			return
 		}
 
@@ -470,7 +465,7 @@ func ActivateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		now := time.Now()
-		admin := models.Admin{
+		user := models.User{
 			ID:           primitive.NewObjectID(),
 			Username:     username,
 			Email:        invitation.Email,
@@ -481,21 +476,21 @@ func ActivateAdminInvitation(db *mongo.Database) gin.HandlerFunc {
 			CreatedAt:    now,
 		}
 
-		if _, err := db.Collection("admins").InsertOne(ctx, admin); err != nil {
+		if _, err := db.Collection("users").InsertOne(ctx, user); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		if _, err := db.Collection("admin_invitations").UpdateByID(ctx, invitation.ID, bson.M{"$set": bson.M{"acceptedAt": now}}); err != nil {
+		if _, err := db.Collection("user_invitations").UpdateByID(ctx, invitation.ID, bson.M{"$set": bson.M{"acceptedAt": now}}); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.JSON(http.StatusCreated, gin.H{
-			"id":       admin.ID.Hex(),
-			"email":    admin.Email,
-			"username": admin.Username,
-			"role":     admin.Role,
+			"id":       user.ID.Hex(),
+			"email":    user.Email,
+			"username": user.Username,
+			"role":     user.Role,
 		})
 	}
 }

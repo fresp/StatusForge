@@ -249,7 +249,7 @@ export default function StatusPage() {
         <div className="text-center py-8 border-t border-gray-200">
           <p className="text-sm text-gray-400">
             Powered by Status Platform •{' '}
-            <a href="/admin" className="text-blue-500 hover:underline">Admin</a>
+            <a href="/admin" className="text-blue-500 hover:underline">User</a>
           </p>
         </div>
       </div>

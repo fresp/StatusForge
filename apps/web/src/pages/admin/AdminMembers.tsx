@@ -2,34 +2,34 @@ import React, { useMemo, useState } from 'react'
 import { Shield, RefreshCw, Plus, X } from 'lucide-react'
 import api from '../../lib/api'
 import { useApi } from '../../hooks/useApi'
-import type { AdminInvitation, AdminMember, AdminRole, AdminStatus } from '../../types'
+import type { UserInvitation, UserMember, UserRole, UserStatus } from '../../types'
 
-const ROLE_OPTIONS: AdminRole[] = ['admin', 'operator']
-const INVITE_ROLE_OPTIONS: Extract<AdminRole, 'admin' | 'operator'>[] = ['admin', 'operator']
+const ROLE_OPTIONS: UserRole[] = ['admin', 'operator']
+const INVITE_ROLE_OPTIONS: Extract<UserRole, 'admin' | 'operator'>[] = ['admin', 'operator']
 
-const STATUS_LABELS: Record<AdminStatus, string> = {
+const STATUS_LABELS: Record<UserStatus, string> = {
   active: 'Active',
   disabled: 'Disabled',
   invited: 'Invited',
 }
 
-const STATUS_BADGE_CLASS: Record<AdminStatus, string> = {
+const STATUS_BADGE_CLASS: Record<UserStatus, string> = {
   active: 'bg-green-100 text-green-700',
   disabled: 'bg-red-100 text-red-700',
   invited: 'bg-yellow-100 text-yellow-700',
 }
 
 interface MeResponse {
-  adminId?: string
+  userId?: string
   username?: string
 }
 
 interface MembersResponse {
-  items?: AdminMember[]
+  items?: UserMember[]
 }
 
 interface InvitationsResponse {
-  items?: AdminInvitation[]
+  items?: UserInvitation[]
 }
 
 interface InviteResponse {
@@ -43,12 +43,12 @@ interface StoredAdminProfile {
   id?: string
   username?: string
   email?: string
-  role?: AdminRole
+  role?: UserRole
 }
 
 function readStoredAdminProfile(): StoredAdminProfile | null {
   try {
-    const raw = localStorage.getItem('admin_profile')
+    const raw = localStorage.getItem('user_profile') || localStorage.getItem('admin_profile')
     if (!raw) return null
     const parsed = JSON.parse(raw) as StoredAdminProfile
     return parsed
@@ -58,20 +58,20 @@ function readStoredAdminProfile(): StoredAdminProfile | null {
 }
 
 export default function AdminMembers() {
-  const { data, loading, error, refetch } = useApi<AdminMember[] | MembersResponse>('/admins')
+  const { data, loading, error, refetch } = useApi<UserMember[] | MembersResponse>('/users')
   const {
     data: invitationsData,
     loading: invitationsLoading,
     error: invitationsError,
     refetch: refetchInvitations,
-  } = useApi<AdminInvitation[] | InvitationsResponse>('/admins/invitations')
+  } = useApi<UserInvitation[] | InvitationsResponse>('/users/invitations')
   const { data: meData } = useApi<MeResponse>('/auth/me')
   const [savingId, setSavingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string>('')
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<Extract<AdminRole, 'admin' | 'operator'>>('admin')
+  const [inviteRole, setInviteRole] = useState<Extract<UserRole, 'operator'>>('operator')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [activationLink, setActivationLink] = useState('')
@@ -87,8 +87,8 @@ export default function AdminMembers() {
     return []
   }, [data])
 
-  const currentAdminId = useMemo(() => {
-    if (meData?.adminId) return meData.adminId
+  const currentUserId = useMemo(() => {
+    if (meData?.userId) return meData.userId
     return readStoredAdminProfile()?.id || null
   }, [meData])
 
@@ -99,30 +99,30 @@ export default function AdminMembers() {
     return []
   }, [invitationsData])
 
-  async function updateMember(id: string, payload: Partial<Pick<AdminMember, 'role' | 'status'>>) {
+  async function updateMember(id: string, payload: Partial<Pick<UserMember, 'role' | 'status'>>) {
     setSavingId(id)
     setActionError('')
     try {
-      await api.patch(`/admins/${id}`, payload)
+      await api.patch(`/users/${id}`, payload)
       await refetch()
     } catch (err: any) {
-      setActionError(err.response?.data?.error || 'Failed to update member. Please try again.')
+      setActionError(err.response?.data?.error || 'Failed to update user. Please try again.')
     } finally {
       setSavingId(null)
     }
   }
 
-  async function deleteMember(member: AdminMember) {
-    const confirmed = window.confirm(`Remove member ${member.username} (${member.email})? This action cannot be undone.`)
+  async function deleteMember(member: UserMember) {
+    const confirmed = window.confirm(`Remove user ${member.username} (${member.email})? This action cannot be undone.`)
     if (!confirmed) return
 
     setDeletingId(member.id)
     setActionError('')
     try {
-      await api.delete(`/admins/${member.id}`)
+      await api.delete(`/users/${member.id}`)
       await refetch()
     } catch (err: any) {
-      setActionError(err.response?.data?.error || 'Failed to delete member. Please try again.')
+      setActionError(err.response?.data?.error || 'Failed to delete user. Please try again.')
     } finally {
       setDeletingId(null)
     }
@@ -130,7 +130,7 @@ export default function AdminMembers() {
 
   function openInviteModal() {
     setInviteEmail('')
-    setInviteRole('admin')
+    setInviteRole('operator')
     setInviteError('')
     setActivationLink('')
     setCopySuccess('')
@@ -143,7 +143,7 @@ export default function AdminMembers() {
     setInviteError('')
     setCopySuccess('')
     try {
-      const res = await api.post<InviteResponse>('/admins/invitations', {
+      const res = await api.post<InviteResponse>('/users/invitations', {
         email: inviteEmail,
         role: inviteRole,
       })
@@ -162,7 +162,7 @@ export default function AdminMembers() {
 
       await refetch()
     } catch (err: any) {
-      setInviteError(err.response?.data?.error || 'Failed to invite member. Please try again.')
+      setInviteError(err.response?.data?.error || 'Failed to invite user. Please try again.')
     } finally {
       setInviting(false)
     }
@@ -178,12 +178,12 @@ export default function AdminMembers() {
     }
   }
 
-  async function refreshInvitationToken(invitation: AdminInvitation) {
+  async function refreshInvitationToken(invitation: UserInvitation) {
     setInviteActionId(invitation.id)
     setInviteActionError('')
     setCopySuccess('')
     try {
-      const res = await api.post<InviteResponse>(`/admins/invitations/${invitation.id}/refresh`)
+      const res = await api.post<InviteResponse>(`/users/invitations/${invitation.id}/refresh`)
       const inviteData = res.data
       const link = inviteData.activationLink || inviteData.activationUrl || inviteData.inviteLink || ''
       if (link) {
@@ -206,7 +206,7 @@ export default function AdminMembers() {
     setInviteActionId(invitationID)
     setInviteActionError('')
     try {
-      await api.delete(`/admins/invitations/${invitationID}`)
+      await api.delete(`/users/invitations/${invitationID}`)
       await refetchInvitations()
     } catch (err: any) {
       setInviteActionError(err.response?.data?.error || 'Failed to remove invitation.')
@@ -219,8 +219,8 @@ export default function AdminMembers() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Members</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage admin accounts, roles, and status</p>
+          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage user accounts, roles, and status</p>
         </div>
         <button
           onClick={() => {
@@ -238,7 +238,7 @@ export default function AdminMembers() {
           className="ml-2 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
-          Invite Member
+          Invite User
         </button>
       </div>
 
@@ -250,19 +250,19 @@ export default function AdminMembers() {
 
       {error && !loading && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          Failed to load members.
+          Failed to load users.
         </div>
       )}
 
       {loading && members.length === 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-          Loading members...
+          Loading users...
         </div>
       )}
 
       {!loading && !error && members.length === 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-          No members found.
+          No users found.
         </div>
       )}
 
@@ -270,17 +270,15 @@ export default function AdminMembers() {
         <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
           <button
             onClick={() => setActiveTab('members')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === 'members' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'members' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
           >
-            Members
+            Users
           </button>
           <button
             onClick={() => setActiveTab('invitations')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === 'invitations' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'invitations' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
           >
             Invitations
           </button>
@@ -292,7 +290,7 @@ export default function AdminMembers() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="text-left px-6 py-3 font-medium text-gray-600">Member</th>
+                <th className="text-left px-6 py-3 font-medium text-gray-600">User</th>
                 <th className="text-left px-6 py-3 font-medium text-gray-600">Role</th>
                 <th className="text-left px-6 py-3 font-medium text-gray-600">Status</th>
                 <th className="text-left px-6 py-3 font-medium text-gray-600">Actions</th>
@@ -303,11 +301,11 @@ export default function AdminMembers() {
                 const isSaving = savingId === member.id
                 const isDeleting = deletingId === member.id
                 const isAdmin = member.role === 'admin'
-                const isCurrentUser = currentAdminId === member.id
+                const isCurrentUser = currentUserId === member.id
                 const canEditRole = !isAdmin && !isSaving && !isDeleting
                 const canToggleStatus = !isAdmin && !isCurrentUser && member.status !== 'invited' && !isSaving && !isDeleting
                 const canDelete = !isCurrentUser && !isSaving && !isDeleting
-                const nextStatus: AdminStatus = member.status === 'disabled' ? 'active' : 'disabled'
+                const nextStatus: UserStatus = member.status === 'disabled' ? 'active' : 'disabled'
 
                 return (
                   <tr key={member.id} className="hover:bg-gray-50">
@@ -325,7 +323,7 @@ export default function AdminMembers() {
                         value={member.role}
                         disabled={!canEditRole}
                         onChange={(e) => {
-                          const role = e.target.value as AdminRole
+                          const role = e.target.value as UserRole
                           void updateMember(member.id, { role })
                         }}
                         className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
@@ -377,7 +375,7 @@ export default function AdminMembers() {
       )}
 
       <div className="mt-8" hidden={activeTab !== 'invitations'}>
-        <h2 className="text-lg font-semibold text-gray-900">Invited Members</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Invited Users</h2>
         <p className="text-sm text-gray-500 mt-1">Pending invitations, token refresh, and removal.</p>
 
         {inviteActionError && (
@@ -462,7 +460,7 @@ export default function AdminMembers() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">Invite Member</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Invite User</h2>
               <button
                 onClick={() => setShowInviteModal(false)}
                 className="text-gray-400 hover:text-gray-600"
@@ -488,7 +486,7 @@ export default function AdminMembers() {
                   required
                   disabled={inviting}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                  placeholder="member@company.com"
+                  placeholder="user@company.com"
                 />
               </div>
 
@@ -496,7 +494,7 @@ export default function AdminMembers() {
                 <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
                 <select
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as Extract<AdminRole, 'admin' | 'operator'>)}
+                  onChange={(e) => setInviteRole(e.target.value as Extract<UserRole, 'operator'>)}
                   disabled={inviting}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                 >

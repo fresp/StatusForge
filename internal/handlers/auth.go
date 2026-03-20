@@ -46,11 +46,11 @@ func loginWithService(authSvc loginService) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"token":       result.Token,
 			"mfaRequired": result.MFARequired,
-			"admin": gin.H{
-				"id":       result.Admin.ID,
-				"username": result.Admin.Username,
-				"email":    result.Admin.Email,
-				"role":     result.Admin.Role,
+			"user": gin.H{
+				"id":       result.User.ID,
+				"username": result.User.Username,
+				"email":    result.User.Email,
+				"role":     result.User.Role,
 			},
 		})
 	}
@@ -58,11 +58,11 @@ func loginWithService(authSvc loginService) gin.HandlerFunc {
 
 func GetMe(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		adminID, _ := c.Get("adminId")
+		userID, _ := c.Get("userId")
 		username, _ := c.Get("username")
 		role, _ := c.Get("role")
 		c.JSON(http.StatusOK, gin.H{
-			"adminId":  adminID,
+			"userId":   userID,
 			"username": username,
 			"role":     role,
 		})

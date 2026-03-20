@@ -29,7 +29,7 @@ export default function AdminActivate() {
 
     setSubmitting(true)
     try {
-      await api.post('/admins/invitations/activate', {
+      await api.post('/users/invitations/activate', {
         token,
         username,
         password,
@@ -45,7 +45,7 @@ export default function AdminActivate() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">Activate Member Account</h1>
+        <h1 className="text-xl font-semibold text-gray-900 mb-1">Activate User Account</h1>
         <p className="text-sm text-gray-500 mb-6">Create your username and password to complete activation.</p>
 
         {error && (

@@ -122,28 +122,28 @@ export interface StatusSummary {
   scheduledMaintenance: number
 }
 
-export interface Admin {
+export interface User {
   id: string
   username: string
   email: string
 }
 
-export type AdminRole = 'admin' | 'operator'
+export type UserRole = 'admin' | 'operator'
 
-export type AdminStatus = 'active' | 'disabled' | 'invited'
+export type UserStatus = 'active' | 'disabled' | 'invited'
 
-export interface AdminMember {
+export interface UserMember {
   id: string
   username: string
   email: string
-  role: AdminRole
-  status: AdminStatus
+  role: UserRole
+  status: UserStatus
 }
 
-export interface AdminInvitation {
+export interface UserInvitation {
   id: string
   email: string
-  role: AdminRole
+  role: UserRole
   expiresAt: string
   createdAt: string
   isExpired: boolean

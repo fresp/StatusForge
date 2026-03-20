@@ -9,23 +9,23 @@ import (
 	"github.com/fresp/StatusForge/internal/models"
 )
 
-type AdminRepository interface {
-	FindByEmail(ctx context.Context, email string) (*models.Admin, error)
+type UserRepository interface {
+	FindByEmail(ctx context.Context, email string) (*models.User, error)
 }
 
-type MongoAdminRepository struct {
+type MongoUserRepository struct {
 	db *mongo.Database
 }
 
-func NewMongoAdminRepository(db *mongo.Database) *MongoAdminRepository {
-	return &MongoAdminRepository{db: db}
+func NewMongoUserRepository(db *mongo.Database) *MongoUserRepository {
+	return &MongoUserRepository{db: db}
 }
 
-func (r *MongoAdminRepository) FindByEmail(ctx context.Context, email string) (*models.Admin, error) {
-	var admin models.Admin
-	err := r.db.Collection("admins").FindOne(ctx, bson.M{"email": email}).Decode(&admin)
+func (r *MongoUserRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+	var user models.User
+	err := r.db.Collection("users").FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
-	return &admin, nil
+	return &user, nil
 }

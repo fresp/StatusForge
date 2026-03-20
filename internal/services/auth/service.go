@@ -19,7 +19,7 @@ type LoginRequest struct {
 
 type LoginResult struct {
 	Token string
-	Admin struct {
+	User  struct {
 		ID       string
 		Username string
 		Email    string
@@ -29,44 +29,44 @@ type LoginResult struct {
 }
 
 type Service struct {
-	repo      repository.AdminRepository
+	repo      repository.UserRepository
 	jwtSecret string
 }
 
-func NewService(repo repository.AdminRepository, jwtSecret string) *Service {
+func NewService(repo repository.UserRepository, jwtSecret string) *Service {
 	return &Service{repo: repo, jwtSecret: jwtSecret}
 }
 
 func NewServiceFromDB(db *mongo.Database, jwtSecret string) *Service {
-	return NewService(repository.NewMongoAdminRepository(db), jwtSecret)
+	return NewService(repository.NewMongoUserRepository(db), jwtSecret)
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResult, error) {
-	admin, err := s.repo.FindByEmail(ctx, req.Email)
+	user, err := s.repo.FindByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
-	role := admin.Role
+	role := user.Role
 	if role == "" {
 		role = "admin"
 	}
 
-	token, err := generateAccessToken(admin.ID.Hex(), admin.Username, role, !admin.MFAEnabled, s.jwtSecret)
+	token, err := generateAccessToken(user.ID.Hex(), user.Username, role, !user.MFAEnabled, s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
 
 	var result LoginResult
 	result.Token = token
-	result.Admin.ID = admin.ID.Hex()
-	result.Admin.Username = admin.Username
-	result.Admin.Email = admin.Email
-	result.Admin.Role = role
+	result.User.ID = user.ID.Hex()
+	result.User.Username = user.Username
+	result.User.Email = user.Email
+	result.User.Role = role
 	result.MFARequired = false
 
 	return &result, nil

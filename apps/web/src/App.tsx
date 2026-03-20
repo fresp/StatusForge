@@ -12,15 +12,15 @@ import AdminMonitors from './pages/admin/AdminMonitors'
 import AdminSubscribers from './pages/admin/AdminSubscribers'
 import AdminMembers from './pages/admin/AdminMembers'
 import AdminActivate from './pages/admin/AdminActivate'
-import type { AdminRole } from './types'
+import type { UserRole } from './types'
 
 interface StoredAdminProfile {
-  role?: AdminRole
+  role?: UserRole
 }
 
-function readStoredRole(): AdminRole | null {
+function readStoredRole(): UserRole | null {
   try {
-    const raw = localStorage.getItem('admin_profile')
+    const raw = localStorage.getItem('user_profile') || localStorage.getItem('admin_profile')
     if (!raw) return null
     const parsed = JSON.parse(raw) as StoredAdminProfile
     return parsed.role ?? null
@@ -30,12 +30,12 @@ function readStoredRole(): AdminRole | null {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('admin_token')
+  const token = localStorage.getItem('user_token') || localStorage.getItem('admin_token')
   if (!token) return <Navigate to="/admin/login" replace />
   return <>{children}</>
 }
 
-function RoleRoute({ allowed, children }: { allowed: AdminRole[]; children: React.ReactNode }) {
+function RoleRoute({ allowed, children }: { allowed: UserRole[]; children: React.ReactNode }) {
   const role = readStoredRole()
   if (!role || !allowed.includes(role)) return <Navigate to="/admin/incidents" replace />
   return <>{children}</>
@@ -102,13 +102,14 @@ export default function App() {
           }
         />
         <Route
-          path="members"
+          path="users"
           element={
             <RoleRoute allowed={['admin']}>
               <AdminMembers />
             </RoleRoute>
           }
         />
+        <Route path="members" element={<Navigate to="/admin/users" replace />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
