@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../../lib/api'
+import { setAuthSession } from '../../lib/auth'
+import type { LoginResponse } from '../../types'
 
 export default function AdminLogin() {
   const navigate = useNavigate()
@@ -14,12 +16,14 @@ export default function AdminLogin() {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post('/auth/login', { email, password })
-      localStorage.setItem('user_token', res.data.token)
-      if (res.data?.user) {
-        localStorage.setItem('user_profile', JSON.stringify(res.data.user))
+      const res = await api.post<LoginResponse>('/auth/login', { email, password })
+      setAuthSession(res.data.token, res.data.user)
+      
+      if (res.data.mfaRequired) {
+        navigate('/admin/profile')
+      } else {
+        navigate('/admin')
       }
-      navigate('/admin')
     } catch (err: any) {
       setError(err.response?.data?.error || 'Invalid credentials')
     } finally {

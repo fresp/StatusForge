@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import StatusPage from './pages/StatusPage'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -12,10 +12,13 @@ import AdminMonitors from './pages/admin/AdminMonitors'
 import AdminSubscribers from './pages/admin/AdminSubscribers'
 import AdminMembers from './pages/admin/AdminMembers'
 import AdminActivate from './pages/admin/AdminActivate'
+import AdminProfile from './pages/admin/AdminProfile'
+import { getStoredToken, getStoredProfile } from './lib/auth'
 import type { UserRole } from './types'
 
 interface StoredAdminProfile {
   role?: UserRole
+  mfaVerified?: boolean
 }
 
 function readStoredRole(): UserRole | null {
@@ -30,8 +33,19 @@ function readStoredRole(): UserRole | null {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('user_token') || localStorage.getItem('admin_token')
+  const token = getStoredToken()
+  const profile = getStoredProfile()
+  const location = useLocation()
+  
   if (!token) return <Navigate to="/admin/login" replace />
+  
+  const isProfileRoute = location.pathname === '/admin/profile'
+  const isMfaComplete = profile?.mfaVerified ?? false
+  
+  if (!isMfaComplete && !isProfileRoute) {
+    return <Navigate to="/admin/profile" replace />
+  }
+  
   return <>{children}</>
 }
 
@@ -42,7 +56,13 @@ function RoleRoute({ allowed, children }: { allowed: UserRole[]; children: React
 }
 
 function AdminIndexRedirect() {
+  const profile = getStoredProfile()
   const role = readStoredRole()
+  
+  if (!(profile?.mfaVerified ?? false)) {
+    return <Navigate to="/admin/profile" replace />
+  }
+  
   if (role === 'operator') return <Navigate to="/admin/incidents" replace />
   return <AdminDashboard />
 }
@@ -56,7 +76,6 @@ export default function App() {
       {/* Admin auth */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/activate" element={<AdminActivate />} />
-
       {/* Admin protected routes */}
       <Route
         path="/admin"
@@ -67,6 +86,7 @@ export default function App() {
         }
       >
         <Route index element={<AdminIndexRedirect />} />
+        <Route path="profile" element={<AdminProfile />} />
         <Route
           path="components"
           element={

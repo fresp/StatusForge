@@ -12,7 +12,6 @@ import (
 type Claims struct {
 	UserID      string `json:"userId"`
 	Username    string `json:"username"`
-	Email       string `json:"email"`
 	Role        string `json:"role,omitempty"`
 	MFAVerified bool   `json:"mfaVerified,omitempty"`
 	jwt.RegisteredClaims
@@ -58,7 +57,6 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		c.Set("userId", claims.UserID)
 		c.Set("username", claims.Username)
-		c.Set("email", claims.Email)
 		c.Set("role", claims.Role)
 		c.Set("mfaVerified", claims.MFAVerified)
 		c.Next()
@@ -97,16 +95,20 @@ func RequireRoles(allowedRoles ...string) gin.HandlerFunc {
 	}
 }
 
-func RequireMFA() gin.HandlerFunc {
+func RequireMFAVerified() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		mfaVerified, exists := c.Get("mfaVerified")
-		if !exists || !mfaVerified.(bool) {
-			if c.Request.URL.Path != "/api/auth/me" &&
-				!strings.HasPrefix(c.Request.URL.Path, "/api/auth/mfa/") {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "mfa verification required"})
-				return
-			}
+		rawMFAVerified, exists := c.Get("mfaVerified")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "mfa verification required"})
+			return
 		}
+
+		mfaVerified, ok := rawMFAVerified.(bool)
+		if !ok || !mfaVerified {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "mfa verification required"})
+			return
+		}
+
 		c.Next()
 	}
 }

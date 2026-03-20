@@ -56,7 +56,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResult, er
 		role = "admin"
 	}
 
-	token, err := generateAccessToken(user.ID.Hex(), user.Username, role, !user.MFAEnabled, s.jwtSecret)
+	token, err := generateAccessToken(user.ID.Hex(), user.Username, role, false, s.jwtSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResult, er
 	result.User.Username = user.Username
 	result.User.Email = user.Email
 	result.User.Role = role
-	result.MFARequired = false
+	result.MFARequired = true
 
 	return &result, nil
 }

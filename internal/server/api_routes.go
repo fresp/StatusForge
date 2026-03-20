@@ -45,15 +45,22 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 	auth := api.Group("")
 	auth.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 
-	auth.GET("/auth/me", handlers.GetMe(database.GetDB()))
+	partialAuth := auth.Group("")
 
-	mfaProtected := auth.Group("")
-	mfaProtected.Use(middleware.RequireMFA())
+	partialAuth.GET("/auth/me", handlers.GetMe(database.GetDB()))
+	partialAuth.PATCH("/auth/me", handlers.ProfileUpdate(database.GetDB(), cfg))
+	partialAuth.POST("/auth/mfa/setup", handlers.MFASetup(database.GetDB(), cfg))
+	partialAuth.POST("/auth/mfa/verify", handlers.MFAVerify(database.GetDB(), cfg))
+	partialAuth.POST("/auth/mfa/recovery/verify", handlers.MFARecoveryVerify(database.GetDB(), cfg))
+	partialAuth.POST("/auth/mfa/disable", handlers.MFADisable(database.GetDB(), cfg))
 
-	adminOnly := mfaProtected.Group("")
+	verifiedAuth := auth.Group("")
+	verifiedAuth.Use(middleware.RequireMFAVerified())
+
+	adminOnly := verifiedAuth.Group("")
 	adminOnly.Use(middleware.RequireRoles("admin"))
 
-	incidentAndMaintenance := mfaProtected.Group("")
+	incidentAndMaintenance := verifiedAuth.Group("")
 	incidentAndMaintenance.Use(middleware.RequireRoles("admin", "operator"))
 
 	incidentAndMaintenance.GET("/incidents", handlers.GetIncidents(database.GetDB()))

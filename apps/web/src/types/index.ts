@@ -126,6 +126,9 @@ export interface User {
   id: string
   username: string
   email: string
+  role: UserRole
+  mfaEnabled?: boolean
+  mfaVerified?: boolean
 }
 
 export type UserRole = 'admin' | 'operator'
@@ -147,4 +150,50 @@ export interface UserInvitation {
   expiresAt: string
   createdAt: string
   isExpired: boolean
+}
+
+export interface LoginResponse {
+  token: string
+  user: User
+  mfaRequired?: boolean
+}
+
+export interface AuthMeResponse {
+  userId: string
+  username: string
+  email: string
+  role: UserRole
+  mfaEnabled: boolean
+  mfaVerified: boolean
+}
+
+export interface StoredUserProfile {
+  id: string
+  username: string
+  email: string
+  role?: UserRole
+  mfaEnabled?: boolean
+  mfaVerified?: boolean
+}
+
+export interface MfaSetupResponse {
+  secret: string
+  otpauthUrl: string
+  recoveryCodes: string[]
+}
+
+export interface MfaVerifyRequest {
+  code: string
+}
+
+export interface MfaVerifyResponse {
+  token: string
+  mfaVerified: boolean
+  user: User
+}
+
+export interface ProfileUpdateRequest {
+  username: string
+  currentPassword?: string
+  newPassword?: string
 }

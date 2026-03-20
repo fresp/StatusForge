@@ -11,6 +11,7 @@ import {
   Shield,
   LogOut,
   ExternalLink,
+  User,
 } from 'lucide-react'
 import type { UserRole } from '../../types'
 
@@ -38,14 +39,18 @@ const navItems = [
   { to: '/admin/monitors', label: 'Monitors', icon: Activity, end: false },
   { to: '/admin/subscribers', label: 'Subscribers', icon: Users, end: false },
   { to: '/admin/users', label: 'Users', icon: Shield, end: false },
+  { to: '/admin/profile', label: 'My Profile', icon: User, end: true },
 ]
 
 const OPERATOR_ALLOWED = new Set(['/admin/incidents', '/admin/maintenance'])
+const ALWAYS_ALLOWED = new Set(['/admin/profile'])
 
 export default function AdminLayout() {
   const navigate = useNavigate()
   const role = readStoredRole()
-  const visibleNavItems = role === 'operator' ? navItems.filter(item => OPERATOR_ALLOWED.has(item.to)) : navItems
+  const visibleNavItems = role === 'operator'
+    ? navItems.filter(item => OPERATOR_ALLOWED.has(item.to) || ALWAYS_ALLOWED.has(item.to))
+    : navItems
 
   function handleLogout() {
     localStorage.removeItem('user_token')
