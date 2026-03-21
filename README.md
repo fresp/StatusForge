@@ -427,7 +427,6 @@ This is unrelated to the status page settings/theme work.
 - [ ] Notification channels (Email, Slack, Webhooks)
 - [ ] Advanced monitoring checks (for example SSL expiry)
 - [ ] Multi-database support
-- [ ] Maintenance workflow expansion
 - [ ] Analytics and reporting
 
 ---
