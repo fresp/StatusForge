@@ -73,14 +73,14 @@ func TestLoginIncludesRoleAndMFAVerifiedClaims(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, result.Token)
 	assert.Equal(t, "admin", result.User.Role)
-	assert.Equal(t, true, result.MFARequired)
+	assert.Equal(t, false, result.MFARequired)
 
 	parsed := &middleware.Claims{}
 	_, err = jwt.ParseWithClaims(result.Token, parsed, func(token *jwt.Token) (interface{}, error) {
 		return []byte("test-secret"), nil
 	})
 	assert.NoError(t, err)
-	assert.False(t, parsed.MFAVerified)
+	assert.True(t, parsed.MFAVerified)
 }
 
 func TestLoginDefaultsRoleToAdminWhenMissing(t *testing.T) {
@@ -103,7 +103,7 @@ func TestLoginDefaultsRoleToAdminWhenMissing(t *testing.T) {
 	result, err := svc.Login(context.Background(), LoginRequest{Email: "legacy@example.com", Password: "secret123"})
 	assert.NoError(t, err)
 	assert.Equal(t, "admin", result.User.Role)
-	assert.True(t, result.MFARequired)
+	assert.False(t, result.MFARequired)
 }
 
 func TestLoginReturnsMFARequiredForUnenrolledUsers(t *testing.T) {
@@ -122,7 +122,7 @@ func TestLoginReturnsMFARequiredForUnenrolledUsers(t *testing.T) {
 	svc := NewService(repo, "test-secret")
 	result, err := svc.Login(context.Background(), LoginRequest{Email: "user-one@example.com", Password: "secret123"})
 	assert.NoError(t, err)
-	assert.True(t, result.MFARequired)
+	assert.False(t, result.MFARequired)
 }
 
 func TestLoginReturnsMFARequiredForEnrolledUsers(t *testing.T) {

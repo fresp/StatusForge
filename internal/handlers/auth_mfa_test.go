@@ -139,6 +139,29 @@ func TestMFAVerifyReturnsVerifiedToken(t *testing.T) {
 	assert.Equal(t, "admin", userResp["role"])
 }
 
+func TestMFAVerifyUsesChallengeForEnabledMFA(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	user := &models.User{ID: primitive.NewObjectID(), Username: "alice", Email: "alice@example.com", Role: "admin", MFAEnabled: true}
+	svc := &stubMFAHandlerService{verifyResult: &authservice.VerifyChallengeResult{Token: "verified-token", MFAVerified: true}}
+
+	router := gin.New()
+	router.POST("/api/auth/mfa/verify", func(c *gin.Context) {
+		c.Set("userId", user.ID.Hex())
+		mfaVerifyWithService(svc, &stubMFAHandlerUserRepo{user: user})(c)
+	})
+
+	req, _ := http.NewRequest(http.MethodPost, "/api/auth/mfa/verify", bytes.NewBuffer([]byte(`{"code":"123456"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, user.ID.Hex(), svc.verifyChallengeReq.UserID)
+	assert.Equal(t, "123456", svc.verifyChallengeReq.Code)
+	assert.Empty(t, svc.verifyEnrollmentReq.UserID)
+}
+
 func TestMFARecoveryVerifyReturnsVerifiedToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -96,15 +96,20 @@ func mfaVerifyWithService(mfaSvc mfaHandlerService, userRepo meUserRepository) g
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		result, err := mfaSvc.VerifyEnrollment(ctx, authservice.VerifyEnrollmentRequest{UserID: userID, Code: req.Code})
-		if err != nil {
-			handleMFAHandlerError(c, err)
-			return
-		}
-
 		user, err := userRepo.FindByID(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+
+		var result *authservice.VerifyChallengeResult
+		if user.MFAEnabled {
+			result, err = mfaSvc.VerifyChallenge(ctx, authservice.VerifyChallengeRequest{UserID: userID, Code: req.Code})
+		} else {
+			result, err = mfaSvc.VerifyEnrollment(ctx, authservice.VerifyEnrollmentRequest{UserID: userID, Code: req.Code})
+		}
+		if err != nil {
+			handleMFAHandlerError(c, err)
 			return
 		}
 

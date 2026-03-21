@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -32,16 +31,16 @@ func TestRequireMFAMiddleware(t *testing.T) {
 			expectedStatus: http.StatusForbidden,
 		},
 		{
-			name:           "should allow access to /auth/me if mfa is not verified",
+			name:           "should block access to /auth/me if mfa is not verified",
 			mfaVerified:    false,
 			path:           "/auth/me",
-			expectedStatus: http.StatusOK,
+			expectedStatus: http.StatusForbidden,
 		},
 		{
-			name:           "should allow access to /auth/mfa/validate if mfa is not verified",
+			name:           "should block access to /auth/mfa/validate if mfa is not verified",
 			mfaVerified:    false,
 			path:           "/auth/mfa/validate",
-			expectedStatus: http.StatusOK,
+			expectedStatus: http.StatusForbidden,
 		},
 	}
 
@@ -54,7 +53,7 @@ func TestRequireMFAMiddleware(t *testing.T) {
 				c.Set("mfaVerified", tt.mfaVerified)
 				c.Next()
 			})
-			r.Use(RequireMFA())
+			r.Use(RequireMFAVerified())
 			r.GET(tt.path, func(c *gin.Context) {
 				c.Status(http.StatusOK)
 			})
