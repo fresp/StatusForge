@@ -119,6 +119,7 @@ func CreateIncident(db *mongo.Database, hub *Hub) gin.HandlerFunc {
 			return
 		}
 
+		DispatchWebhookEvent(db, "incident_created", incident)
 		BroadcastEvent(hub, "incident_created", incident)
 		c.JSON(http.StatusCreated, incident)
 	}
@@ -191,6 +192,7 @@ func UpdateIncident(db *mongo.Database, hub *Hub) gin.HandlerFunc {
 		if incident.Status == models.IncidentResolved {
 			eventType = "incident_resolved"
 		}
+		DispatchWebhookEvent(db, eventType, incident)
 		BroadcastEvent(hub, eventType, incident)
 		c.JSON(http.StatusOK, incident)
 	}
@@ -254,6 +256,7 @@ func AddIncidentUpdate(db *mongo.Database, hub *Hub) gin.HandlerFunc {
 			return
 		}
 
+		DispatchWebhookEvent(db, "incident_update_added", update)
 		BroadcastEvent(hub, "incident_update_added", update)
 
 		c.JSON(http.StatusCreated, update)

@@ -15,6 +15,8 @@ An open-source, self-hosted status page platform for monitoring services and man
 - **Members & Invitations Split View** - Manage active members and pending invitations in separate admin sections
 - **Self-hosted** - Full control over your data and infrastructure
 - **Lightweight Architecture** - Simple Go backend with React frontend
+- **Webhook Notification Channels** - Configure webhooks to receive incident and maintenance updates
+- **Custom Status Page Themes and Settings** - Customize the look and feel of your public status page
 
 ---
 
@@ -107,9 +109,9 @@ Password: admin123
 
 - [ ] Multi-database support (PostgreSQL, MySQL)
 - [x] Basic role-based multi-user admin system (admin/operator)
-- [ ] Notification channels (Email, Slack, Webhooks)
+- [x] Notification channels (Email, Slack, Webhooks)
 - [ ] Advanced monitoring checks (ICMP, SSL expiry)
-- [ ] Custom status page themes
+- [x] Custom status page themes
 - [ ] Maintenance window scheduling
 - [ ] Analytics and reporting
 

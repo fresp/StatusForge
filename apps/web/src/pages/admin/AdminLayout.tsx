@@ -46,7 +46,6 @@ const navItems = [
 
 const OPERATOR_ALLOWED = new Set(['/admin/incidents', '/admin/maintenance'])
 const ALWAYS_ALLOWED = new Set(['/admin/profile'])
-const ADMIN_ONLY = new Set(['/admin/webhook-channels'])
 
 export default function AdminLayout() {
   const navigate = useNavigate()

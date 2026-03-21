@@ -96,6 +96,9 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 
 	adminOnly.GET("/subscribers", handlers.GetSubscribers(database.GetDB()))
 	adminOnly.DELETE("/subscribers/:id", handlers.DeleteSubscriber(database.GetDB()))
+	adminOnly.GET("/webhook-channels", handlers.GetWebhookChannels(database.GetDB()))
+	adminOnly.POST("/webhook-channels", handlers.CreateWebhookChannel(database.GetDB()))
+	adminOnly.DELETE("/webhook-channels/:id", handlers.DeleteWebhookChannel(database.GetDB()))
 
 	adminOnly.GET("/users", handlers.GetUsers(database.GetDB()))
 	adminOnly.PATCH("/users/:id", handlers.PatchUser(database.GetDB()))

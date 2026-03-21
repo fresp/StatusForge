@@ -119,6 +119,7 @@ func CreateMaintenance(db *mongo.Database) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		DispatchWebhookEvent(db, "maintenance_created", m)
 		c.JSON(http.StatusCreated, m)
 	}
 }
@@ -180,6 +181,7 @@ func UpdateMaintenance(db *mongo.Database) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		DispatchWebhookEvent(db, "maintenance_updated", m)
 		c.JSON(http.StatusOK, m)
 	}
 }
