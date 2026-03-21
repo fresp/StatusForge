@@ -9,6 +9,7 @@ import {
   Activity,
   Users,
   Shield,
+  Settings,
   LogOut,
   ExternalLink,
   User,
@@ -39,6 +40,7 @@ const navItems = [
   { to: '/admin/monitors', label: 'Monitors', icon: Activity, end: false },
   { to: '/admin/subscribers', label: 'Subscribers', icon: Users, end: false },
   { to: '/admin/users', label: 'Users', icon: Shield, end: false },
+  { to: '/admin/settings', label: 'Settings', icon: Settings, end: false },
   { to: '/admin/profile', label: 'My Profile', icon: User, end: true },
 ]
 

@@ -13,6 +13,7 @@ import AdminSubscribers from './pages/admin/AdminSubscribers'
 import AdminMembers from './pages/admin/AdminMembers'
 import AdminActivate from './pages/admin/AdminActivate'
 import AdminProfile from './pages/admin/AdminProfile'
+import AdminSettings from './pages/admin/AdminSettings'
 import { getStoredToken, getStoredProfile } from './lib/auth'
 import type { UserRole } from './types'
 
@@ -126,6 +127,14 @@ export default function App() {
           element={
             <RoleRoute allowed={['admin']}>
               <AdminMembers />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <RoleRoute allowed={['admin']}>
+              <AdminSettings />
             </RoleRoute>
           }
         />

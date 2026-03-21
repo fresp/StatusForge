@@ -1,10 +1,137 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { CheckCircle, AlertTriangle, AlertCircle, XCircle, Wrench, ChevronDown, ChevronUp } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useWebSocket } from '../hooks/useWebSocket'
-import type { StatusSummary, ComponentWithSubs, Incident, Maintenance } from '../types'
+import type { StatusSummary, ComponentWithSubs, Incident, Maintenance, StatusPageSettings } from '../types'
 import { STATUS_COLORS, STATUS_LABELS, STATUS_TEXT_COLORS, getOverallStatusLabel, formatDate, formatDateShort, INCIDENT_STATUS_LABELS, INCIDENT_IMPACT_LABELS } from '../lib/utils'
 import { IncidentTimeline } from '../components/IncidentTimeline'
+
+const DEFAULT_SETTINGS: StatusPageSettings = {
+  head: {
+    title: 'Status Platform',
+    description: 'Live system status and incident updates.',
+    keywords: 'status, uptime, incidents, maintenance',
+    faviconUrl: '/vite.svg',
+    metaTags: {},
+  },
+  branding: {
+    siteName: 'System Status',
+    logoUrl: '',
+  },
+  theme: {
+    primaryColor: '#16a34a',
+    backgroundColor: '#f9fafb',
+    textColor: '#111827',
+  },
+  layout: {
+    variant: 'classic',
+  },
+  footer: {
+    text: '',
+    showPoweredBy: true,
+  },
+  customCss: '',
+  updatedAt: '',
+  createdAt: '',
+}
+
+function normalizeSettings(settings?: StatusPageSettings | null): StatusPageSettings {
+  if (!settings) {
+    return DEFAULT_SETTINGS
+  }
+
+  return {
+    head: {
+      title: settings.head?.title || DEFAULT_SETTINGS.head.title,
+      description: settings.head?.description || DEFAULT_SETTINGS.head.description,
+      keywords: settings.head?.keywords || DEFAULT_SETTINGS.head.keywords,
+      faviconUrl: settings.head?.faviconUrl || DEFAULT_SETTINGS.head.faviconUrl,
+      metaTags: settings.head?.metaTags || {},
+    },
+    branding: {
+      siteName: settings.branding?.siteName || DEFAULT_SETTINGS.branding.siteName,
+      logoUrl: settings.branding?.logoUrl || '',
+    },
+    theme: {
+      primaryColor: settings.theme?.primaryColor || DEFAULT_SETTINGS.theme.primaryColor,
+      backgroundColor: settings.theme?.backgroundColor || DEFAULT_SETTINGS.theme.backgroundColor,
+      textColor: settings.theme?.textColor || DEFAULT_SETTINGS.theme.textColor,
+    },
+    layout: {
+      variant: settings.layout?.variant === 'compact' ? 'compact' : 'classic',
+    },
+    footer: {
+      text: settings.footer?.text || '',
+      showPoweredBy: settings.footer?.showPoweredBy ?? true,
+    },
+    customCss: settings.customCss || '',
+    updatedAt: settings.updatedAt || '',
+    createdAt: settings.createdAt || '',
+  }
+}
+
+function upsertMetaTag(selector: string, content: string) {
+  const existing = document.head.querySelector(`meta[${selector}]`)
+  if (content) {
+    if (existing) {
+      existing.setAttribute('content', content)
+      return
+    }
+
+    const meta = document.createElement('meta')
+    const [attr, value] = selector.split('=')
+    meta.setAttribute(attr, value.replace(/"/g, ''))
+    meta.setAttribute('content', content)
+    document.head.appendChild(meta)
+    return
+  }
+
+  if (existing) {
+    existing.remove()
+  }
+}
+
+function setCustomMetaTags(metaTags: Record<string, string>) {
+  const existing = document.head.querySelectorAll('meta[data-status-page-meta="true"]')
+  existing.forEach(node => node.remove())
+
+  Object.entries(metaTags).forEach(([key, value]) => {
+    if (!key || !value) {
+      return
+    }
+
+    const meta = document.createElement('meta')
+    if (key.startsWith('og:') || key.startsWith('twitter:')) {
+      meta.setAttribute('property', key)
+    } else {
+      meta.setAttribute('name', key)
+    }
+    meta.setAttribute('content', value)
+    meta.setAttribute('data-status-page-meta', 'true')
+    document.head.appendChild(meta)
+  })
+}
+
+function upsertFavicon(url: string) {
+  let link = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]')
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    document.head.appendChild(link)
+  }
+  link.href = url
+}
+
+function upsertCustomCss(css: string) {
+  const id = 'status-page-custom-css'
+  let styleEl = document.getElementById(id) as HTMLStyleElement | null
+  if (!styleEl) {
+    styleEl = document.createElement('style')
+    styleEl.id = id
+    document.head.appendChild(styleEl)
+  }
+  styleEl.textContent = css
+}
 
 function StatusIcon({ status }: { status: string }) {
   const cls = 'w-5 h-5'
@@ -37,6 +164,7 @@ export default function StatusPage() {
   const { data: summary, refetch: refetchSummary } = useApi<StatusSummary>('/status/summary')
   const { data: components, refetch: refetchComponents } = useApi<ComponentWithSubs[]>('/status/components')
   const { data: incidentData, refetch: refetchIncidents } = useApi<{ active: Incident[]; resolved: Incident[] }>('/status/incidents')
+  const { data: settingsData, refetch: refetchSettings } = useApi<StatusPageSettings>('/status/settings')
 
   const { data: maintenanceData } = useApi<Maintenance[]>('/maintenance')
 
@@ -49,11 +177,15 @@ export default function StatusPage() {
       refetchIncidents()
       refetchSummary()
     }
-  }, [refetchComponents, refetchSummary, refetchIncidents])
+    if (event.type === 'status_page_settings_updated') {
+      refetchSettings()
+    }
+  }, [refetchComponents, refetchSummary, refetchIncidents, refetchSettings])
 
   useWebSocket(handleWsMessage)
 
   const overallStatus = summary?.overallStatus || 'operational'
+  const settings = normalizeSettings(settingsData)
   const activeIncidents = incidentData?.active || []
   const resolvedIncidents = incidentData?.resolved || []
   const upcomingMaintenance = maintenanceData?.filter(m => m.status !== 'completed') || []
@@ -67,12 +199,46 @@ export default function StatusPage() {
     maintenance: 'bg-blue-600',
   }
 
+  useEffect(() => {
+    document.title = settings.head.title
+    upsertMetaTag('name="description"', settings.head.description)
+    upsertMetaTag('name="keywords"', settings.head.keywords)
+    setCustomMetaTags(settings.head.metaTags)
+    upsertFavicon(settings.head.faviconUrl)
+    upsertCustomCss(settings.customCss)
+  }, [settings])
+
+  const pageStyle: React.CSSProperties = {
+    backgroundColor: settings.theme.backgroundColor,
+    color: settings.theme.textColor,
+  }
+
+  const headerStyle: React.CSSProperties = {
+    backgroundColor: settings.theme.primaryColor,
+  }
+
+  const contentClassName = settings.layout.variant === 'compact'
+    ? 'max-w-3xl mx-auto px-4 py-6 space-y-6'
+    : 'max-w-4xl mx-auto px-4 py-8 space-y-8'
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={pageStyle}>
       {/* Header */}
-      <div className={`${headerBg[overallStatus] || 'bg-green-600'} text-white py-12 px-4`}>
+      <div
+        className={`${headerBg[overallStatus] || 'bg-green-600'} text-white py-12 px-4`}
+        style={headerStyle}
+      >
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-2">System Status</h1>
+          <div className="flex items-center gap-3 mb-2">
+            {settings.branding.logoUrl && (
+              <img
+                src={settings.branding.logoUrl}
+                alt={`${settings.branding.siteName} logo`}
+                className="w-10 h-10 object-contain rounded"
+              />
+            )}
+            <h1 className="text-3xl font-bold">{settings.branding.siteName}</h1>
+          </div>
           <div className="flex items-center gap-3 text-xl">
             <CheckCircle className="w-7 h-7" />
             <span>{getOverallStatusLabel(overallStatus as any)}</span>
@@ -83,7 +249,7 @@ export default function StatusPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      <div className={contentClassName}>
 
         {/* Active Incidents Banner */}
         {activeIncidents.map(incident => {
@@ -247,9 +413,12 @@ export default function StatusPage() {
 
         {/* Footer */}
         <div className="text-center py-8 border-t border-gray-200">
-          <p className="text-sm text-gray-400">
-            Powered by Status Platform •{' '}
-          </p>
+          {settings.footer.text && (
+            <p className="text-sm text-gray-500 mb-1">{settings.footer.text}</p>
+          )}
+          {settings.footer.showPoweredBy && (
+            <p className="text-sm text-gray-400">Powered by Status Platform</p>
+          )}
         </div>
       </div>
     </div>

@@ -33,10 +33,12 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 	}))
 
 	api := r.Group("/api")
+	r.GET("/ws", handlers.ServeWs(hub))
 
 	api.GET("/status/summary", handlers.GetStatusSummary(database.GetDB()))
 	api.GET("/status/components", handlers.GetStatusComponents(database.GetDB()))
 	api.GET("/status/incidents", handlers.GetStatusIncidents(database.GetDB()))
+	api.GET("/status/settings", handlers.GetPublicStatusPageSettings(database.GetDB()))
 	api.POST("/subscribe", handlers.Subscribe(database.GetDB()))
 
 	api.POST("/auth/login", handlers.Login(database.GetDB(), cfg.JWTSecret))
@@ -96,6 +98,8 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 
 	adminOnly.GET("/subscribers", handlers.GetSubscribers(database.GetDB()))
 	adminOnly.DELETE("/subscribers/:id", handlers.DeleteSubscriber(database.GetDB()))
+	adminOnly.GET("/settings/status-page", handlers.GetAdminStatusPageSettings(database.GetDB()))
+	adminOnly.PATCH("/settings/status-page", handlers.UpdateStatusPageSettings(database.GetDB(), hub))
 
 	adminOnly.GET("/users", handlers.GetUsers(database.GetDB()))
 	adminOnly.PATCH("/users/:id", handlers.PatchUser(database.GetDB()))

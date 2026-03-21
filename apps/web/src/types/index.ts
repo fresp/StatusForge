@@ -197,3 +197,59 @@ export interface ProfileUpdateRequest {
   currentPassword?: string
   newPassword?: string
 }
+
+export interface StatusPageSettings {
+  head: {
+    title: string
+    description: string
+    keywords: string
+    faviconUrl: string
+    metaTags: Record<string, string>
+  }
+  branding: {
+    siteName: string
+    logoUrl: string
+  }
+  theme: {
+    primaryColor: string
+    backgroundColor: string
+    textColor: string
+  }
+  layout: {
+    variant: 'classic' | 'compact'
+  }
+  footer: {
+    text: string
+    showPoweredBy: boolean
+  }
+  customCss: string
+  updatedAt: string
+  createdAt: string
+}
+
+export interface StatusPageSettingsPatchRequest {
+  head?: {
+    title?: string
+    description?: string
+    keywords?: string
+    faviconUrl?: string
+    metaTags?: Record<string, string>
+  }
+  branding?: {
+    siteName?: string
+    logoUrl?: string
+  }
+  theme?: {
+    primaryColor?: string
+    backgroundColor?: string
+    textColor?: string
+  }
+  layout?: {
+    variant?: 'classic' | 'compact'
+  }
+  footer?: {
+    text?: string
+    showPoweredBy?: boolean
+  }
+  customCss?: string
+}
