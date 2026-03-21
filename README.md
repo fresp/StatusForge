@@ -6,29 +6,17 @@ StatusForge is a self-hosted status page platform built with a Go API/server and
 
 ## Overview
 
-StatusForge serves three roles from one application runtime:
-
-- **Public status page** for customers and stakeholders
-- **Admin panel** for operators and admins
-- **Monitoring worker** for scheduled health checks and outage tracking
-
-The backend exposes JSON APIs under `/api`, serves a WebSocket endpoint at `/ws`, and embeds the built frontend assets into the final server binary for production deployment.
-
----
-
-## Core Features
-
-- **Service monitoring** with HTTP, TCP, DNS, and ping monitors
-- **Incident management** with updates and public incident timelines
-- **Maintenance management** for planned downtime workflows
-- **Public status page** with real-time updates over WebSockets
-- **Status page settings** for branding, SEO metadata, layout, footer, and theme customization
-- **Custom status page themes** with persisted MongoDB settings and runtime application on the public page
-- **Role-based admin access** with `admin` and `operator` roles
-- **MFA-aware authentication** for protected admin APIs
-- **Subscriber management** for status updates
-- **Background outage detection** and uptime aggregation
-- **Self-hosted deployment** with Docker Compose support
+- **Service Monitoring** - Track the status of your services in real-time
+- **Incident Management** - Create, update, and resolve incidents with timelines
+- **Role-Based Admin Access** - Enforce RBAC with `admin` and `operator` roles on admin APIs
+- **Operator Scope Enforcement** - Limit operator access to incidents and maintenance workflows
+- **Public Status Page** - Share service status with your users
+- **Real-time Updates** - WebSocket-powered live updates
+- **Members & Invitations Split View** - Manage active members and pending invitations in separate admin sections
+- **Self-hosted** - Full control over your data and infrastructure
+- **Lightweight Architecture** - Simple Go backend with React frontend
+- **Webhook Notification Channels** - Configure webhooks to receive incident and maintenance updates
+- **Custom Status Page Themes and Settings** - Customize the look and feel of your public status page
 
 ---
 
@@ -424,7 +412,7 @@ This is unrelated to the status page settings/theme work.
 
 - [x] Basic role-based multi-user admin system (`admin` / `operator`)
 - [x] Custom status page settings and initial theme support
-- [ ] Notification channels (Email, Slack, Webhooks)
+- [x] Notification channels (Webhooks)
 - [ ] Advanced monitoring checks (for example SSL expiry)
 - [ ] Multi-database support
 - [ ] Analytics and reporting

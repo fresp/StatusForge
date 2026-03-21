@@ -14,6 +14,7 @@ import AdminMembers from './pages/admin/AdminMembers'
 import AdminActivate from './pages/admin/AdminActivate'
 import AdminProfile from './pages/admin/AdminProfile'
 import AdminSettings from './pages/admin/AdminSettings'
+import AdminWebhookChannels from './pages/admin/AdminWebhookChannels'
 import { getStoredToken, getStoredProfile } from './lib/auth'
 import type { UserRole } from './types'
 
@@ -37,16 +38,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = getStoredToken()
   const profile = getStoredProfile()
   const location = useLocation()
-  
+
   if (!token) return <Navigate to="/admin/login" replace />
-  
+
   const isProfileRoute = location.pathname === '/admin/profile'
   const isMfaComplete = profile?.mfaVerified ?? false
-  
+
   if (!isMfaComplete && !isProfileRoute) {
     return <Navigate to="/admin/profile" replace />
   }
-  
+
   return <>{children}</>
 }
 
@@ -59,11 +60,11 @@ function RoleRoute({ allowed, children }: { allowed: UserRole[]; children: React
 function AdminIndexRedirect() {
   const profile = getStoredProfile()
   const role = readStoredRole()
-  
+
   if (!(profile?.mfaVerified ?? false)) {
     return <Navigate to="/admin/profile" replace />
   }
-  
+
   if (role === 'operator') return <Navigate to="/admin/incidents" replace />
   return <AdminDashboard />
 }
@@ -119,6 +120,14 @@ export default function App() {
           element={
             <RoleRoute allowed={['admin']}>
               <AdminSubscribers />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="webhook-channels"
+          element={
+            <RoleRoute allowed={['admin']}>
+              <AdminWebhookChannels />
             </RoleRoute>
           }
         />

@@ -253,3 +253,10 @@ export interface StatusPageSettingsPatchRequest {
   }
   customCss?: string
 }
+export interface WebhookChannel {
+  id: string
+  name: string
+  url: string
+  enabled: boolean
+  createdAt: string
+}
