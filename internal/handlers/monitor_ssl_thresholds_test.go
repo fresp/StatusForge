@@ -3,10 +3,12 @@ package handlers
 import (
 	"reflect"
 	"testing"
+
+	monitorservice "github.com/fresp/StatusForge/internal/services/monitor"
 )
 
 func TestSanitizeSSLThresholds_DefaultWhenEmpty(t *testing.T) {
-	got := sanitizeSSLThresholds(nil)
+	got := monitorservice.SanitizeSSLThresholds(nil)
 	want := []int{30, 14, 7}
 
 	if !reflect.DeepEqual(got, want) {
@@ -15,7 +17,7 @@ func TestSanitizeSSLThresholds_DefaultWhenEmpty(t *testing.T) {
 }
 
 func TestSanitizeSSLThresholds_FiltersDeduplicatesAndSortsDescending(t *testing.T) {
-	got := sanitizeSSLThresholds([]int{7, 30, 14, 14, -1, 0})
+	got := monitorservice.SanitizeSSLThresholds([]int{7, 30, 14, 14, -1, 0})
 	want := []int{30, 14, 7}
 
 	if !reflect.DeepEqual(got, want) {

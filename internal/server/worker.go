@@ -94,6 +94,9 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 	sslWarning := false
 	sslDaysRemaining := 0
 	sslTriggeredThreshold := 0
+	domainWarning := false
+	domainDaysRemaining := 0
+	domainTriggeredThreshold := 0
 
 	timeout := time.Duration(mon.TimeoutSeconds) * time.Second
 	if timeout == 0 {
@@ -103,13 +106,36 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 	if len(sslThresholds) == 0 {
 		sslThresholds = []int{30, 14, 7}
 	}
+	advanced := mon.Monitoring.Advanced
 
 	switch mon.Type {
 	case models.MonitorHTTP:
-		code, err := utils.CheckHTTP(mon.Target, timeout)
+		code, err := utils.CheckHTTP(mon.Target, timeout, advanced.IgnoreTLSError)
 		statusCode = code
 		if err != nil || code >= 500 || code == 0 {
 			status = models.MonitorDown
+		}
+
+		if advanced.CertExpiry {
+			result, sslErr := utils.CheckHTTPSSLCertificate(mon.Target, timeout, sslThresholds)
+			if sslErr != nil {
+				status = models.MonitorDown
+			} else {
+				sslWarning = result.Warning
+				sslDaysRemaining = result.DaysRemaining
+				sslTriggeredThreshold = result.TriggeredThreshold
+			}
+		}
+
+		if advanced.DomainExpiry {
+			result, domainErr := utils.CheckDomain(mon.Target, string(mon.Type), sslThresholds)
+			if domainErr != nil {
+				status = models.MonitorDown
+			} else {
+				domainWarning = result.Warning
+				domainDaysRemaining = result.DaysRemaining
+				domainTriggeredThreshold = result.TriggeredThreshold
+			}
 		}
 	case models.MonitorTCP:
 		if err := utils.CheckTCP(mon.Target, timeout); err != nil {
@@ -132,20 +158,34 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 			sslDaysRemaining = result.DaysRemaining
 			sslTriggeredThreshold = result.TriggeredThreshold
 		}
+
+		if advanced.DomainExpiry {
+			result, domainErr := utils.CheckDomain(mon.Target, string(mon.Type), sslThresholds)
+			if domainErr != nil {
+				status = models.MonitorDown
+			} else {
+				domainWarning = result.Warning
+				domainDaysRemaining = result.DaysRemaining
+				domainTriggeredThreshold = result.TriggeredThreshold
+			}
+		}
 	}
 
 	responseTime := time.Since(start).Milliseconds()
 
 	logEntry := models.EnhancedMonitorLog{
-		ID:                    primitive.NewObjectID(),
-		MonitorID:             mon.ID,
-		Status:                status,
-		SSLWarning:            sslWarning,
-		SSLDaysRemaining:      sslDaysRemaining,
-		SSLTriggeredThreshold: sslTriggeredThreshold,
-		ResponseTime:          responseTime,
-		StatusCode:            statusCode,
-		CheckedAt:             time.Now(),
+		ID:                       primitive.NewObjectID(),
+		MonitorID:                mon.ID,
+		Status:                   status,
+		SSLWarning:               sslWarning,
+		SSLDaysRemaining:         sslDaysRemaining,
+		SSLTriggeredThreshold:    sslTriggeredThreshold,
+		DomainWarning:            domainWarning,
+		DomainDaysRemaining:      domainDaysRemaining,
+		DomainTriggeredThreshold: domainTriggeredThreshold,
+		ResponseTime:             responseTime,
+		StatusCode:               statusCode,
+		CheckedAt:                time.Now(),
 	}
 
 	ctx2, cancel2 := context.WithTimeout(workerCtx, 5*time.Second)
@@ -156,16 +196,20 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 	db.Collection("monitors").UpdateOne(ctx2,
 		bson.M{"_id": mon.ID},
 		bson.M{"$set": bson.M{
-			"lastStatus":            status,
-			"sslWarning":            sslWarning,
-			"sslDaysRemaining":      sslDaysRemaining,
-			"sslTriggeredThreshold": sslTriggeredThreshold,
-			"lastCheckedAt":         time.Now(),
+			"lastStatus":               status,
+			"sslWarning":               sslWarning,
+			"sslDaysRemaining":         sslDaysRemaining,
+			"sslTriggeredThreshold":    sslTriggeredThreshold,
+			"domainWarning":            domainWarning,
+			"domainDaysRemaining":      domainDaysRemaining,
+			"domainTriggeredThreshold": domainTriggeredThreshold,
+			"lastCheckedAt":            time.Now(),
 		}},
 	)
 
-	if mon.Type == models.MonitorSSL {
-		applySSLWarningStatus(ctx2, db, mon, sslWarning)
+	combinedWarning := sslWarning || domainWarning
+	if mon.Type == models.MonitorSSL || advanced.DomainExpiry {
+		applySSLWarningStatus(ctx2, db, mon, combinedWarning)
 	}
 
 	updateDailyUptime(db, mon.ID, status)

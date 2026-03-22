@@ -1,13 +1,19 @@
 package utils
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"golang.org/x/net/icmp"
@@ -20,8 +26,13 @@ type SSLCheckResult struct {
 	Warning            bool
 }
 
-func CheckHTTP(target string, timeout time.Duration) (int, error) {
+func CheckHTTP(target string, timeout time.Duration, ignoreTLSError ...bool) (int, error) {
 	client := &http.Client{Timeout: timeout}
+	if len(ignoreTLSError) > 0 && ignoreTLSError[0] {
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
 	resp, err := client.Get(target)
 	if err != nil {
 		return 0, err
@@ -126,6 +137,230 @@ func CheckSSL(target string, timeout time.Duration, thresholds []int) (SSLCheckR
 		TriggeredThreshold: triggered,
 		Warning:            triggered > 0,
 	}, nil
+}
+
+func CheckHTTPSSLCertificate(target string, timeout time.Duration, thresholds []int) (SSLCheckResult, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return SSLCheckResult{}, err
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return SSLCheckResult{}, fmt.Errorf("target has no hostname")
+	}
+
+	port := u.Port()
+	if port == "" {
+		port = "443"
+	}
+
+	return CheckSSL(net.JoinHostPort(host, port), timeout, thresholds)
+}
+
+type DomainCheckResult struct {
+	DaysRemaining      int
+	TriggeredThreshold int
+	Warning            bool
+}
+
+func CheckDomain(target string, monitorType string, thresholds []int) (DomainCheckResult, error) {
+	domain, err := extractDomain(target, monitorType)
+	if err != nil {
+		return DomainCheckResult{}, err
+	}
+
+	expiresAt, err := lookupDomainExpiry(domain)
+	if err != nil {
+		return DomainCheckResult{}, err
+	}
+
+	daysRemaining := int(time.Until(expiresAt).Hours() / 24)
+	if daysRemaining < 0 {
+		daysRemaining = 0
+	}
+
+	triggered := pickTriggeredThreshold(daysRemaining, thresholds)
+
+	return DomainCheckResult{
+		DaysRemaining:      daysRemaining,
+		TriggeredThreshold: triggered,
+		Warning:            triggered > 0,
+	}, nil
+}
+
+func extractDomain(target string, monitorType string) (string, error) {
+	if monitorType == "http" {
+		u, err := url.Parse(target)
+		if err != nil {
+			return "", err
+		}
+		host := u.Hostname()
+		if host == "" {
+			return "", fmt.Errorf("target has no hostname")
+		}
+		if net.ParseIP(host) != nil {
+			return "", fmt.Errorf("domain_expiry does not support IP targets")
+		}
+		return host, nil
+	}
+
+	host, _, err := net.SplitHostPort(target)
+	if err != nil {
+		host = target
+	}
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return "", fmt.Errorf("empty host")
+	}
+	if net.ParseIP(host) != nil {
+		return "", fmt.Errorf("domain_expiry does not support IP targets")
+	}
+	return host, nil
+}
+
+func lookupDomainExpiry(domain string) (time.Time, error) {
+	if expiry, err := lookupRDAPExpiry(domain); err == nil {
+		return expiry, nil
+	}
+
+	return lookupWhoisExpiry(domain)
+}
+
+func lookupRDAPExpiry(domain string) (time.Time, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get("https://rdap.org/domain/" + domain)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return time.Time{}, fmt.Errorf("rdap returned status %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		Events []struct {
+			EventAction string `json:"eventAction"`
+			EventDate   string `json:"eventDate"`
+		} `json:"events"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return time.Time{}, err
+	}
+
+	for _, event := range payload.Events {
+		action := strings.ToLower(strings.TrimSpace(event.EventAction))
+		if action != "expiration" && action != "expiry" && action != "expires" {
+			continue
+		}
+		expiry, err := time.Parse(time.RFC3339, event.EventDate)
+		if err == nil {
+			return expiry, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("no domain expiry event in rdap response")
+}
+
+func lookupWhoisExpiry(domain string) (time.Time, error) {
+	tld := domain
+	if idx := strings.LastIndex(domain, "."); idx >= 0 && idx < len(domain)-1 {
+		tld = domain[idx+1:]
+	}
+
+	ianaResp, err := queryWhoisServer("whois.iana.org:43", tld)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	whoisServer := ""
+	scanner := bufio.NewScanner(strings.NewReader(ianaResp))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(strings.ToLower(line), "whois:") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				whoisServer = strings.TrimSpace(parts[1])
+				break
+			}
+		}
+	}
+	if whoisServer == "" {
+		return time.Time{}, fmt.Errorf("no whois server found for tld %s", tld)
+	}
+
+	resp, err := queryWhoisServer(net.JoinHostPort(whoisServer, "43"), domain)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	expiry, err := parseExpiryFromWhois(resp)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return expiry, nil
+}
+
+func queryWhoisServer(address string, query string) (string, error) {
+	conn, err := net.DialTimeout("tcp", address, 10*time.Second)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	if err := conn.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return "", err
+	}
+
+	if _, err := fmt.Fprintf(conn, "%s\r\n", query); err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(conn); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
+
+func parseExpiryFromWhois(response string) (time.Time, error) {
+	patterns := []string{
+		`(?im)^(?:Registry Expiry Date|Registrar Registration Expiration Date|Expiration Date|Expiry date|expires|paid-till|renewal date)\s*:\s*(.+)$`,
+	}
+
+	timeFormats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+		"2006.01.02",
+		"02-Jan-2006",
+		"02.01.2006 15:04:05",
+		"2006/01/02",
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindAllStringSubmatch(response, -1)
+		for _, m := range matches {
+			if len(m) < 2 {
+				continue
+			}
+			candidate := strings.TrimSpace(m[1])
+			candidate = strings.Trim(candidate, ".")
+			for _, format := range timeFormats {
+				if parsed, err := time.Parse(format, candidate); err == nil {
+					return parsed, nil
+				}
+			}
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse domain expiry from whois response")
 }
 
 func pickTriggeredThreshold(daysRemaining int, thresholds []int) int {

@@ -81,6 +81,13 @@ export interface Monitor {
   name: string
   type: MonitorType
   target: string
+  monitoring?: {
+    advanced?: {
+      domain_expiry?: boolean
+      cert_expiry?: boolean
+      ignore_tls_error?: boolean
+    }
+  }
   sslThresholds?: number[]
   intervalSeconds: number
   timeoutSeconds: number
@@ -90,6 +97,9 @@ export interface Monitor {
   sslWarning?: boolean
   sslDaysRemaining?: number
   sslTriggeredThreshold?: number
+  domainWarning?: boolean
+  domainDaysRemaining?: number
+  domainTriggeredThreshold?: number
   lastCheckedAt?: string
   createdAt: string
 }

@@ -3,10 +3,11 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"sort"
 	"time"
 
 	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/StatusForge/internal/repository"
+	monitorservice "github.com/fresp/StatusForge/internal/services/monitor"
 	"github.com/fresp/StatusForge/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,22 +21,13 @@ func GetMonitors(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		cursor, err := db.Collection("monitors").Find(ctx, bson.M{},
-			options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		monitors, err := service.List(ctx)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		defer cursor.Close(ctx)
 
-		var monitors []models.Monitor
-		if err := cursor.All(ctx, &monitors); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		if monitors == nil {
-			monitors = []models.Monitor{}
-		}
 		c.JSON(http.StatusOK, monitors)
 	}
 }
@@ -43,14 +35,15 @@ func GetMonitors(db *mongo.Database) gin.HandlerFunc {
 func CreateMonitor(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Name            string             `json:"name" binding:"required"`
-			Type            models.MonitorType `json:"type" binding:"required"`
-			Target          string             `json:"target" binding:"required"`
-			SSLThresholds   []int              `json:"sslThresholds"`
-			IntervalSeconds int                `json:"intervalSeconds"`
-			TimeoutSeconds  int                `json:"timeoutSeconds"`
-			ComponentID     string             `json:"componentId"`
-			SubComponentID  string             `json:"subComponentId"`
+			Name            string               `json:"name" binding:"required"`
+			Type            models.MonitorType   `json:"type" binding:"required"`
+			Target          string               `json:"target" binding:"required"`
+			Monitoring      models.MonitorConfig `json:"monitoring"`
+			SSLThresholds   []int                `json:"sslThresholds"`
+			IntervalSeconds int                  `json:"intervalSeconds"`
+			TimeoutSeconds  int                  `json:"timeoutSeconds"`
+			ComponentID     string               `json:"componentId"`
+			SubComponentID  string               `json:"subComponentId"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -58,57 +51,26 @@ func CreateMonitor(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		// Must have at least one target
-		if req.ComponentID == "" && req.SubComponentID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "must specify componentId or subComponentId"})
-			return
-		}
-
-		if req.IntervalSeconds == 0 {
-			req.IntervalSeconds = 60
-		}
-
-		if req.TimeoutSeconds == 0 {
-			req.TimeoutSeconds = 30
-		}
-
-		var compID primitive.ObjectID
-		var subCompID primitive.ObjectID
-
-		// If subcomponent is provided, prioritize it
-		if req.SubComponentID != "" && req.SubComponentID != "000000000000000000000000" {
-			oid, err := primitive.ObjectIDFromHex(req.SubComponentID)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subComponentId"})
-				return
-			}
-			subCompID = oid
-		} else if req.ComponentID != "" && req.ComponentID != "000000000000000000000000" {
-			oid, err := primitive.ObjectIDFromHex(req.ComponentID)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid componentId"})
-				return
-			}
-			compID = oid
-		}
-
-		monitor := models.Monitor{
-			ID:              primitive.NewObjectID(),
-			Name:            req.Name,
-			Type:            req.Type,
-			Target:          req.Target,
-			SSLThresholds:   sanitizeSSLThresholds(req.SSLThresholds),
-			IntervalSeconds: req.IntervalSeconds,
-			TimeoutSeconds:  req.TimeoutSeconds,
-			ComponentID:     compID,
-			SubComponentID:  subCompID,
-			CreatedAt:       time.Now(),
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if _, err := db.Collection("monitors").InsertOne(ctx, monitor); err != nil {
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		monitor, err := service.Create(ctx, monitorservice.MonitorUpsertInput{
+			Name:            req.Name,
+			Type:            req.Type,
+			Target:          req.Target,
+			Monitoring:      req.Monitoring,
+			SSLThresholds:   req.SSLThresholds,
+			IntervalSeconds: req.IntervalSeconds,
+			TimeoutSeconds:  req.TimeoutSeconds,
+			ComponentID:     req.ComponentID,
+			SubComponentID:  req.SubComponentID,
+		})
+		if err != nil {
+			if _, ok := err.(*monitorservice.ValidationError); ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -126,14 +88,15 @@ func UpdateMonitor(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		var req struct {
-			Name            string             `json:"name" binding:"required"`
-			Type            models.MonitorType `json:"type" binding:"required"`
-			Target          string             `json:"target" binding:"required"`
-			SSLThresholds   []int              `json:"sslThresholds"`
-			IntervalSeconds int                `json:"intervalSeconds"`
-			TimeoutSeconds  int                `json:"timeoutSeconds"`
-			ComponentID     string             `json:"componentId"`
-			SubComponentID  string             `json:"subComponentId"`
+			Name            string               `json:"name" binding:"required"`
+			Type            models.MonitorType   `json:"type" binding:"required"`
+			Target          string               `json:"target" binding:"required"`
+			Monitoring      models.MonitorConfig `json:"monitoring"`
+			SSLThresholds   []int                `json:"sslThresholds"`
+			IntervalSeconds int                  `json:"intervalSeconds"`
+			TimeoutSeconds  int                  `json:"timeoutSeconds"`
+			ComponentID     string               `json:"componentId"`
+			SubComponentID  string               `json:"subComponentId"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -141,61 +104,30 @@ func UpdateMonitor(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		if req.ComponentID == "" && req.SubComponentID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "must specify componentId or subComponentId"})
-			return
-		}
-
-		if req.IntervalSeconds == 0 {
-			req.IntervalSeconds = 60
-		}
-
-		if req.TimeoutSeconds == 0 {
-			req.TimeoutSeconds = 30
-		}
-
-		var compID primitive.ObjectID
-		var subCompID primitive.ObjectID
-
-		if req.SubComponentID != "" && req.SubComponentID != "000000000000000000000000" {
-			oid, err := primitive.ObjectIDFromHex(req.SubComponentID)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subComponentId"})
-				return
-			}
-			subCompID = oid
-		} else if req.ComponentID != "" && req.ComponentID != "000000000000000000000000" {
-			oid, err := primitive.ObjectIDFromHex(req.ComponentID)
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid componentId"})
-				return
-			}
-			compID = oid
-		}
-
-		update := bson.M{
-			"$set": bson.M{
-				"name":            req.Name,
-				"type":            req.Type,
-				"target":          req.Target,
-				"sslThresholds":   sanitizeSSLThresholds(req.SSLThresholds),
-				"intervalSeconds": req.IntervalSeconds,
-				"timeoutSeconds":  req.TimeoutSeconds,
-				"componentId":     compID,
-				"subComponentId":  subCompID,
-				"updatedAt":       time.Now(),
-			},
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		res, err := db.Collection("monitors").UpdateOne(ctx, bson.M{"_id": id}, update)
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		matched, err := service.Update(ctx, id, monitorservice.MonitorUpsertInput{
+			Name:            req.Name,
+			Type:            req.Type,
+			Target:          req.Target,
+			Monitoring:      req.Monitoring,
+			SSLThresholds:   req.SSLThresholds,
+			IntervalSeconds: req.IntervalSeconds,
+			TimeoutSeconds:  req.TimeoutSeconds,
+			ComponentID:     req.ComponentID,
+			SubComponentID:  req.SubComponentID,
+		})
 		if err != nil {
+			if _, ok := err.(*monitorservice.ValidationError); ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		if res.MatchedCount == 0 {
+		if !matched {
 			c.JSON(http.StatusNotFound, gin.H{"error": "monitor not found"})
 			return
 		}
@@ -207,10 +139,11 @@ func UpdateMonitor(db *mongo.Database) gin.HandlerFunc {
 func TestMonitor() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Type           models.MonitorType `json:"type" binding:"required"`
-			Target         string             `json:"target" binding:"required"`
-			SSLThresholds  []int              `json:"sslThresholds"`
-			TimeoutSeconds int                `json:"timeoutSeconds"`
+			Type           models.MonitorType   `json:"type" binding:"required"`
+			Target         string               `json:"target" binding:"required"`
+			Monitoring     models.MonitorConfig `json:"monitoring"`
+			SSLThresholds  []int                `json:"sslThresholds"`
+			TimeoutSeconds int                  `json:"timeoutSeconds"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -229,14 +162,42 @@ func TestMonitor() gin.HandlerFunc {
 		sslWarning := false
 		sslDaysRemaining := 0
 		sslTriggeredThreshold := 0
-		thresholds := sanitizeSSLThresholds(req.SSLThresholds)
+		domainWarning := false
+		domainDaysRemaining := 0
+		domainTriggeredThreshold := 0
+		thresholds := monitorservice.SanitizeSSLThresholds(req.SSLThresholds)
+
+		if err := monitorservice.ValidateAdvancedOptions(req.Type, req.Target, req.Monitoring.Advanced); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		switch req.Type {
 		case models.MonitorHTTP:
-			code, err := utils.CheckHTTP(req.Target, timeout)
+			code, err := utils.CheckHTTP(req.Target, timeout, req.Monitoring.Advanced.IgnoreTLSError)
 			statusCode = code
 			if err != nil || code >= 500 || code == 0 {
 				status = models.MonitorDown
+			}
+			if req.Monitoring.Advanced.CertExpiry {
+				result, sslErr := utils.CheckHTTPSSLCertificate(req.Target, timeout, thresholds)
+				if sslErr != nil {
+					status = models.MonitorDown
+				} else {
+					sslWarning = result.Warning
+					sslDaysRemaining = result.DaysRemaining
+					sslTriggeredThreshold = result.TriggeredThreshold
+				}
+			}
+			if req.Monitoring.Advanced.DomainExpiry {
+				result, domainErr := utils.CheckDomain(req.Target, string(req.Type), thresholds)
+				if domainErr != nil {
+					status = models.MonitorDown
+				} else {
+					domainWarning = result.Warning
+					domainDaysRemaining = result.DaysRemaining
+					domainTriggeredThreshold = result.TriggeredThreshold
+				}
 			}
 		case models.MonitorTCP:
 			if err := utils.CheckTCP(req.Target, timeout); err != nil {
@@ -259,48 +220,32 @@ func TestMonitor() gin.HandlerFunc {
 				sslDaysRemaining = result.DaysRemaining
 				sslTriggeredThreshold = result.TriggeredThreshold
 			}
+			if req.Monitoring.Advanced.DomainExpiry {
+				result, domainErr := utils.CheckDomain(req.Target, string(req.Type), thresholds)
+				if domainErr != nil {
+					status = models.MonitorDown
+				} else {
+					domainWarning = result.Warning
+					domainDaysRemaining = result.DaysRemaining
+					domainTriggeredThreshold = result.TriggeredThreshold
+				}
+			}
 		}
 
 		responseTime := time.Since(start).Milliseconds()
 
 		c.JSON(http.StatusOK, gin.H{
-			"status":                status,
-			"statusCode":            statusCode,
-			"responseTime":          responseTime,
-			"sslWarning":            sslWarning,
-			"sslDaysRemaining":      sslDaysRemaining,
-			"sslTriggeredThreshold": sslTriggeredThreshold,
+			"status":                   status,
+			"statusCode":               statusCode,
+			"responseTime":             responseTime,
+			"sslWarning":               sslWarning,
+			"sslDaysRemaining":         sslDaysRemaining,
+			"sslTriggeredThreshold":    sslTriggeredThreshold,
+			"domainWarning":            domainWarning,
+			"domainDaysRemaining":      domainDaysRemaining,
+			"domainTriggeredThreshold": domainTriggeredThreshold,
 		})
 	}
-}
-
-func sanitizeSSLThresholds(thresholds []int) []int {
-	if len(thresholds) == 0 {
-		return []int{30, 14, 7}
-	}
-
-	valid := make([]int, 0, len(thresholds))
-	seen := map[int]bool{}
-	for _, threshold := range thresholds {
-		if threshold <= 0 {
-			continue
-		}
-		if seen[threshold] {
-			continue
-		}
-		seen[threshold] = true
-		valid = append(valid, threshold)
-	}
-
-	if len(valid) == 0 {
-		return []int{30, 14, 7}
-	}
-
-	sort.Slice(valid, func(i, j int) bool {
-		return valid[i] > valid[j]
-	})
-
-	return valid
 }
 
 func GetMonitorLogs(db *mongo.Database) gin.HandlerFunc {

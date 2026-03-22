@@ -225,6 +225,11 @@ func CreateUserInvitation(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		email := strings.ToLower(strings.TrimSpace(req.Email))
+		role := strings.ToLower(strings.TrimSpace(req.Role))
+		if _, ok := allowedUserRoles[role]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
+			return
+		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -257,7 +262,7 @@ func CreateUserInvitation(db *mongo.Database) gin.HandlerFunc {
 			ID:        primitive.NewObjectID(),
 			TokenHash: tokenHash,
 			Email:     email,
-			Role:      req.Role,
+			Role:      role,
 			ExpiresAt: now.Add(48 * time.Hour),
 			CreatedBy: createdBy,
 			CreatedAt: now,

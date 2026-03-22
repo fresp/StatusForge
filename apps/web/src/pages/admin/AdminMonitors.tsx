@@ -3,7 +3,6 @@ import { Plus, Trash2, X, Activity, Edit2, CheckCircle2, XCircle, AlertCircle } 
 import { useApi } from '../../hooks/useApi'
 import api from '../../lib/api'
 import type { Monitor, Component, SubComponent, MonitorType } from '../../types'
-import { formatDate } from '../../lib/utils'
 
 const MONITOR_TYPES: MonitorType[] = ['http', 'tcp', 'dns', 'ping', 'ssl']
 
@@ -12,6 +11,9 @@ interface FormState {
   type: MonitorType
   target: string
   sslThresholds: string
+  domainExpiry: boolean
+  certExpiry: boolean
+  ignoreTLSError: boolean
   intervalSeconds: number
   timeoutSeconds: number
   componentId: string
@@ -24,6 +26,9 @@ const DEFAULT_FORM: FormState = {
   type: 'http',
   target: '',
   sslThresholds: '30,14,7',
+  domainExpiry: false,
+  certExpiry: false,
+  ignoreTLSError: false,
   intervalSeconds: 60,
   timeoutSeconds: 10,
   componentId: '',
@@ -68,8 +73,16 @@ export default function AdminMonitors() {
     sslWarning?: boolean
     sslDaysRemaining?: number
     sslTriggeredThreshold?: number
+    domainWarning?: boolean
+    domainDaysRemaining?: number
+    domainTriggeredThreshold?: number
   } | null>(null)
   const [error, setError] = useState('')
+
+  const supportsDomainExpiry = form.type === 'http' || form.type === 'ssl'
+  const supportsCertExpiry = form.type === 'http' || form.type === 'ssl'
+  const supportsIgnoreTLSError = form.type === 'http'
+  const needsThresholds = form.type === 'ssl' || form.domainExpiry || form.certExpiry
   
   function openCreate() {
     setEditingId(null)
@@ -86,6 +99,9 @@ export default function AdminMonitors() {
       type: m.type,
       target: m.target,
       sslThresholds: (m.sslThresholds && m.sslThresholds.length > 0) ? m.sslThresholds.join(',') : '30,14,7',
+      domainExpiry: Boolean(m.monitoring?.advanced?.domain_expiry),
+      certExpiry: Boolean(m.monitoring?.advanced?.cert_expiry),
+      ignoreTLSError: Boolean(m.monitoring?.advanced?.ignore_tls_error),
       intervalSeconds: m.intervalSeconds,
       timeoutSeconds: m.timeoutSeconds,
       componentId: m.componentId || '',
@@ -107,7 +123,20 @@ export default function AdminMonitors() {
     setTestResult(null)
     setError('')
     try {
-      const res = await api.post('/monitors/test', form)
+      const res = await api.post('/monitors/test', {
+        ...form,
+        sslThresholds:
+          form.type === 'ssl' || form.domainExpiry || form.certExpiry
+            ? form.sslThresholds.split(',').map(v => parseInt(v.trim(), 10)).filter(v => Number.isFinite(v) && v > 0)
+            : undefined,
+        monitoring: {
+          advanced: {
+            domain_expiry: form.domainExpiry,
+            cert_expiry: form.certExpiry,
+            ignore_tls_error: form.ignoreTLSError,
+          },
+        },
+      })
       setTestResult(res.data)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to test monitor')
@@ -121,20 +150,25 @@ export default function AdminMonitors() {
     setSaving(true)
     setError('')
     try {
+      const payload = {
+        ...form,
+        sslThresholds:
+          form.type === 'ssl' || form.domainExpiry || form.certExpiry
+            ? form.sslThresholds.split(',').map(v => parseInt(v.trim(), 10)).filter(v => Number.isFinite(v) && v > 0)
+            : undefined,
+        monitoring: {
+          advanced: {
+            domain_expiry: form.domainExpiry,
+            cert_expiry: form.certExpiry,
+            ignore_tls_error: form.ignoreTLSError,
+          },
+        },
+      }
+
       if (editingId) {
-        await api.put(`/monitors/${editingId}`, {
-          ...form,
-          sslThresholds: form.type === 'ssl'
-            ? form.sslThresholds.split(',').map(v => parseInt(v.trim(), 10)).filter(v => Number.isFinite(v) && v > 0)
-            : undefined,
-        })
+        await api.put(`/monitors/${editingId}`, payload)
       } else {
-        await api.post('/monitors', {
-          ...form,
-          sslThresholds: form.type === 'ssl'
-            ? form.sslThresholds.split(',').map(v => parseInt(v.trim(), 10)).filter(v => Number.isFinite(v) && v > 0)
-            : undefined,
-        })
+        await api.post('/monitors', payload)
       }
       await refetch()
       closeModal()
@@ -272,7 +306,31 @@ export default function AdminMonitors() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select
                 value={form.type}
-                onChange={e => setForm(f => ({ ...f, type: e.target.value as MonitorType, target: '' }))}
+                onChange={e =>
+                  setForm(f => {
+                    const nextType = e.target.value as MonitorType
+                    const canUseDomainExpiry = nextType === 'http' || nextType === 'ssl'
+                    const canUseCertExpiry = nextType === 'http' || nextType === 'ssl'
+                    const canUseIgnoreTLSError = nextType === 'http'
+
+                    const nextDomainExpiry = canUseDomainExpiry ? f.domainExpiry : false
+                    const nextCertExpiry = canUseCertExpiry ? f.certExpiry : false
+                    let nextIgnoreTLSError = canUseIgnoreTLSError ? f.ignoreTLSError : false
+
+                    if (nextCertExpiry && nextIgnoreTLSError) {
+                      nextIgnoreTLSError = false
+                    }
+
+                    return {
+                      ...f,
+                      type: nextType,
+                      target: '',
+                      domainExpiry: nextDomainExpiry,
+                      certExpiry: nextCertExpiry,
+                      ignoreTLSError: nextIgnoreTLSError,
+                    }
+                  })
+                }
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {MONITOR_TYPES.map(t => (
@@ -290,15 +348,84 @@ export default function AdminMonitors() {
                 placeholder={TYPE_PLACEHOLDERS[form.type]}
               />
             </div>
-            {form.type === 'ssl' && (
+            {needsThresholds && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">SSL Alert Thresholds (days)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Alert Thresholds (days)</label>
                 <input
                   value={form.sslThresholds}
                   onChange={e => setForm(f => ({ ...f, sslThresholds: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   placeholder="30,14,7"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Used for certificate and domain expiry warnings (highest threshold first).
+                </p>
+              </div>
+            )}
+
+            {(supportsDomainExpiry || supportsCertExpiry || supportsIgnoreTLSError) && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Advanced Monitoring</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Enable optional checks depending on monitor type compatibility.
+                  </p>
+                </div>
+
+                {supportsDomainExpiry && (
+                  <label className="flex items-start gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.domainExpiry}
+                      onChange={e => setForm(f => ({ ...f, domainExpiry: e.target.checked }))}
+                      className="mt-0.5"
+                    />
+                    <span>Domain expiry monitoring</span>
+                  </label>
+                )}
+
+                {supportsCertExpiry && (
+                  <label className="flex items-start gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.certExpiry}
+                      onChange={e =>
+                        setForm(f => ({
+                          ...f,
+                          certExpiry: e.target.checked,
+                          ignoreTLSError: e.target.checked ? false : f.ignoreTLSError,
+                        }))
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>Certificate expiry monitoring</span>
+                  </label>
+                )}
+
+                {supportsIgnoreTLSError && (
+                  <label className="flex items-start gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.ignoreTLSError}
+                      disabled={form.certExpiry}
+                      onChange={e =>
+                        setForm(f => ({
+                          ...f,
+                          ignoreTLSError: e.target.checked,
+                          certExpiry: e.target.checked ? false : f.certExpiry,
+                        }))
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>Ignore TLS certificate errors (HTTP only)</span>
+                  </label>
+                )}
+
+                {form.type === 'http' && (form.certExpiry || form.ignoreTLSError) && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    HTTP target must use <span className="font-mono">https://</span> when certificate expiry or ignore TLS errors is enabled.
+                  </p>
+                )}
               </div>
             )}
             <div>
@@ -369,12 +496,14 @@ export default function AdminMonitors() {
               <div className={`px-3 py-2 rounded-lg text-sm flex items-center justify-between ${testResult.status === 'up' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
                 <span className="font-medium">
                   Test Result: {testResult.status.toUpperCase()}
-                  {form.type === 'ssl' && testResult.sslWarning ? ' (WARNING)' : ''}
+                  {testResult.sslWarning || testResult.domainWarning ? ' (WARNING)' : ''}
                 </span>
                 <span>
-                  {form.type === 'ssl' && typeof testResult.sslDaysRemaining === 'number'
-                    ? `${testResult.sslDaysRemaining}d left`
-                    : `${testResult.responseTime}ms`}
+                  {typeof testResult.domainDaysRemaining === 'number'
+                    ? `Domain: ${testResult.domainDaysRemaining}d left`
+                    : typeof testResult.sslDaysRemaining === 'number'
+                      ? `Cert: ${testResult.sslDaysRemaining}d left`
+                      : `${testResult.responseTime}ms`}
                 </span>
               </div>
             )}

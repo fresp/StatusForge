@@ -5,12 +5,14 @@ StatusForge is a production-ready, self-hosted status page and monitoring platfo
 ## ✨ Key Features
 
 - **Real-time Monitoring**: Track the uptime and performance of your services with instant updates.
+- **Advanced Certificate & Domain Expiry Monitoring**: Track SSL certificate expiry and domain expiration windows with configurable alert thresholds.
 - **Incident & Maintenance Management**: Efficiently create, update, and resolve incidents and schedule maintenance events.
 - **Customizable Public Status Page**: Brand your status page to match your company's identity with flexible theming and content options.
 - **Role-Based Access Control (RBAC)**: Secure admin workflows with distinct `admin` and `operator` roles.
 - **Multi-Factor Authentication (MFA)**: Enhance security for administrative access.
 - **Subscriber Management**: Allow users to subscribe to updates for incidents and maintenance.
 - **Webhook Integrations**: Configure webhooks for automated notifications on service status changes.
+- **Flexible HTTPS Checks**: For HTTPS-based HTTP monitors, optionally ignore TLS certificate errors during availability checks when certificate expiry monitoring is not enabled.
 - **Self-Hosted**: Full control over your data and infrastructure.
 
 ## 🚀 Screenshots
@@ -58,6 +60,7 @@ Ensure you have Docker and Docker Compose installed on your system.
     -   `MFA_SECRET_KEY`: Secret key for MFA ( **change this in production!** ).
     -   `PORT`: The port StatusForge will run on (default: `8080`).
     -   `ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`: Credentials for the initial admin user (used for bootstrap only).
+    -   `ENABLE_WORKER`: Enables the background worker that executes monitor checks and writes monitor status updates.
 
 3.  **Start the Services:**
     Build and start all services using Docker Compose:
@@ -91,7 +94,11 @@ For developers who want to contribute or customize StatusForge, you can run the 
 ### Backend
 
 1.  **Configure Environment Variables**: Copy `.env.example` to `.env` as described in the Docker Quick Start.
-2.  **Run the Go server**:
+2.  **Install Go dependencies**:
+    ```bash
+    go mod download
+    ```
+3.  **Run the Go server**:
     ```bash
     go run cmd/server/main.go
     ```
@@ -133,7 +140,7 @@ To build the frontend and backend for production:
 
 The provided `Dockerfile` creates a minimal Alpine-based image embedding the built frontend assets into the Go binary. The `docker-compose.yml` orchestrates the `server`, `mongo`, and `redis` services.
 
-For detailed Docker operations, refer to the `Makefile` for convenient commands like `make up`, `make down`, `make logs`, etc.
+For detailed Docker operations, refer to the `Makefile` for convenient commands like `make up`, `make up-build`, `make down`, `make down-v`, `make logs`, `make logs-server`, `make ps`, and `make shell-server`.
 
 ## 🤝 Contributing
 
