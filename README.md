@@ -7,6 +7,7 @@ StatusForge is a production-ready, self-hosted status page and monitoring platfo
 - **Real-time Monitoring**: Track the uptime and performance of your services with instant updates.
 - **Advanced Certificate & Domain Expiry Monitoring**: Track SSL certificate expiry and domain expiration windows with configurable alert thresholds.
 - **Incident & Maintenance Management**: Efficiently create, update, and resolve incidents and schedule maintenance events.
+- **Admin Console UX**: Navigate the admin area more efficiently with grouped, collapsible sidebar sections and clearer visual hierarchy.
 - **Customizable Public Status Page**: Brand your status page to match your company's identity with flexible theming and content options.
 - **Role-Based Access Control (RBAC)**: Secure admin workflows with distinct `admin` and `operator` roles.
 - **Multi-Factor Authentication (MFA)**: Enhance security for administrative access.

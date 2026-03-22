@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Layers,
-  GitBranch,
   AlertTriangle,
   Wrench,
   Activity,
@@ -16,6 +15,8 @@ import {
   Webhook,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import type { UserRole } from '../../types'
 
@@ -94,10 +95,39 @@ const navSections: NavSection[] = [
 
 const OPERATOR_ALLOWED = new Set(['/admin/incidents', '/admin/maintenance'])
 const ALWAYS_ALLOWED = new Set(['/admin/profile'])
+const SIDEBAR_SECTION_STATE_KEY = 'admin_sidebar_section_state'
+
+function sectionKey(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+}
+
+function isRouteActive(pathname: string, to: string, end: boolean): boolean {
+  if (end) {
+    return pathname === to
+  }
+
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
+
+function isSectionActive(pathname: string, section: NavSection): boolean {
+  return section.items.some(item => {
+    if (isRouteActive(pathname, item.to, item.end)) {
+      return true
+    }
+
+    if (!item.children || item.children.length === 0) {
+      return false
+    }
+
+    return item.children.some(child => isRouteActive(pathname, child.to, child.end))
+  })
+}
 
 export default function AdminLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({})
   const role = readStoredRole()
   const visibleNavSections: NavSection[] = role === 'operator'
     ? navSections
@@ -139,6 +169,83 @@ export default function AdminLayout() {
 
   const sidebarWidthClass = isSidebarCollapsed ? 'w-16' : 'w-64'
   const sidebarOffsetClass = isSidebarCollapsed ? 'ml-16' : 'ml-64'
+  const visibleSectionKeys = useMemo(
+    () => visibleNavSections.map(section => sectionKey(section.label)),
+    [visibleNavSections],
+  )
+
+  useEffect(() => {
+    let stored: Record<string, boolean> = {}
+
+    try {
+      const raw = localStorage.getItem(SIDEBAR_SECTION_STATE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, boolean>
+        if (parsed && typeof parsed === 'object') {
+          stored = parsed
+        }
+      }
+    } catch {
+      stored = {}
+    }
+
+    setOpenSections(prev => {
+      const next: Record<string, boolean> = {}
+
+      visibleSectionKeys.forEach(key => {
+        if (typeof prev[key] === 'boolean') {
+          next[key] = prev[key]
+        } else if (typeof stored[key] === 'boolean') {
+          next[key] = stored[key]
+        } else {
+          next[key] = true
+        }
+      })
+
+      return next
+    })
+  }, [visibleSectionKeys])
+
+  useEffect(() => {
+    if (visibleSectionKeys.length === 0) return
+
+    const hasCompleteSectionState = visibleSectionKeys.every(
+      key => typeof openSections[key] === 'boolean',
+    )
+
+    if (!hasCompleteSectionState) return
+
+    const next: Record<string, boolean> = {}
+    visibleSectionKeys.forEach(key => {
+      next[key] = openSections[key] ?? true
+    })
+
+    localStorage.setItem(SIDEBAR_SECTION_STATE_KEY, JSON.stringify(next))
+  }, [openSections, visibleSectionKeys])
+
+  useEffect(() => {
+    setOpenSections(prev => {
+      let changed = false
+      const next = { ...prev }
+
+      visibleNavSections.forEach(section => {
+        const key = sectionKey(section.label)
+        if (isSectionActive(location.pathname, section) && next[key] === false) {
+          next[key] = true
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
+    })
+  }, [location.pathname, visibleNavSections])
+
+  function toggleSection(key: string) {
+    setOpenSections(prev => ({
+      ...prev,
+      [key]: !(prev[key] ?? true),
+    }))
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -163,55 +270,71 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        <nav className="flex-1 py-4 px-3 overflow-y-auto min-h-0">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 pb-8 [scrollbar-width:thin] [scrollbar-color:rgb(75_85_99)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-700/70 hover:[&::-webkit-scrollbar-thumb]:bg-gray-600/80">
           {visibleNavSections.map(section => (
-            <div key={section.label} className="space-y-1">
+            <div key={section.label} className="mt-3 first:mt-0 space-y-1.5">
               {!isSidebarCollapsed && (
-                <p className="sticky top-0 z-10 -mx-3 px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 bg-gray-900/95 backdrop-blur-sm">
-                  {section.label}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sectionKey(section.label))}
+                  aria-expanded={openSections[sectionKey(section.label)] ?? true}
+                  className="sticky top-0 z-10 -mx-3 w-[calc(100%+1.5rem)] flex items-center justify-between px-3 pt-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500/90 bg-gray-900/95 backdrop-blur-sm"
+                >
+                  <span>{section.label}</span>
+                  {(openSections[sectionKey(section.label)] ?? true) ? (
+                    <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                </button>
               )}
 
-              {section.items.map(({ to, label, icon: Icon, end, children }) => (
-                <div key={to} className="space-y-1">
-                  <NavLink
-                    to={to}
-                    end={end}
-                    title={isSidebarCollapsed ? label : undefined}
-                    className={({ isActive }) =>
-                      `flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2 rounded-lg text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-400 hover:bg-gray-800/70 hover:text-gray-200'
-                      }`
-                    }
-                  >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                    {!isSidebarCollapsed && <span className="truncate">{label}</span>}
-                  </NavLink>
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${(openSections[sectionKey(section.label)] ?? true) || isSidebarCollapsed ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+              >
+                <div className="overflow-hidden">
+                  {section.items.map(({ to, label, icon: Icon, end, children }) => (
+                    <div key={to} className="space-y-1">
+                      <NavLink
+                        to={to}
+                        end={end}
+                        title={isSidebarCollapsed ? label : undefined}
+                        className={({ isActive }) =>
+                          `flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 pl-3 pr-3'} py-2.5 rounded-lg border-l-2 text-sm leading-5 font-medium transition-colors ${
+                            isActive
+                              ? 'bg-blue-600/95 text-white border-blue-300 shadow-sm'
+                              : 'text-gray-500 border-transparent hover:bg-gray-800/60 hover:text-gray-200'
+                          }`
+                        }
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        {!isSidebarCollapsed && <span className="truncate">{label}</span>}
+                      </NavLink>
 
-                  {!isSidebarCollapsed && children && children.length > 0 && (
-                    <div className="ml-7 pl-3 border-l border-gray-800 space-y-1">
-                      {children.map(child => (
-                        <NavLink
-                          key={child.to}
-                          to={child.to}
-                          end={child.end}
-                          className={({ isActive }) =>
-                            `block px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                              isActive
-                                ? 'bg-blue-600 text-white'
-                                : 'text-gray-500 hover:bg-gray-800/60 hover:text-gray-200'
-                            }`
-                          }
-                        >
-                          {child.label}
-                        </NavLink>
-                      ))}
+                      {!isSidebarCollapsed && children && children.length > 0 && (
+                        <div className="ml-6 pl-3 border-l border-gray-700/80 space-y-1.5">
+                          {children.map(child => (
+                            <NavLink
+                              key={child.to}
+                              to={child.to}
+                              end={child.end}
+                              className={({ isActive }) =>
+                                `block px-3 py-2 rounded-md text-[13px] leading-5 font-medium transition-colors ${
+                                  isActive
+                                    ? 'bg-blue-600/90 text-white'
+                                    : 'text-gray-400 hover:bg-gray-800/60 hover:text-gray-200'
+                                }`
+                              }
+                            >
+                              {child.label}
+                            </NavLink>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           ))}
         </nav>
