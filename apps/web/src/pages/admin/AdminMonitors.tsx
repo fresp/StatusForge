@@ -5,12 +5,13 @@ import api from '../../lib/api'
 import type { Monitor, Component, SubComponent, MonitorType } from '../../types'
 import { formatDate } from '../../lib/utils'
 
-const MONITOR_TYPES: MonitorType[] = ['http', 'tcp', 'dns', 'ping']
+const MONITOR_TYPES: MonitorType[] = ['http', 'tcp', 'dns', 'ping', 'ssl']
 
 interface FormState {
   name: string
   type: MonitorType
   target: string
+  sslThresholds: string
   intervalSeconds: number
   timeoutSeconds: number
   componentId: string
@@ -22,6 +23,7 @@ const DEFAULT_FORM: FormState = {
   name: '',
   type: 'http',
   target: '',
+  sslThresholds: '30,14,7',
   intervalSeconds: 60,
   timeoutSeconds: 10,
   componentId: '',
@@ -48,6 +50,7 @@ const TYPE_PLACEHOLDERS: Record<MonitorType, string> = {
   tcp: 'example.com:443',
   dns: 'example.com',
   ping: 'example.com',
+  ssl: 'example.com:443',
 }
 
 export default function AdminMonitors() {
@@ -59,7 +62,13 @@ export default function AdminMonitors() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<{status: string, responseTime: number} | null>(null)
+  const [testResult, setTestResult] = useState<{
+    status: string
+    responseTime: number
+    sslWarning?: boolean
+    sslDaysRemaining?: number
+    sslTriggeredThreshold?: number
+  } | null>(null)
   const [error, setError] = useState('')
   
   function openCreate() {
@@ -76,6 +85,7 @@ export default function AdminMonitors() {
       name: m.name,
       type: m.type,
       target: m.target,
+      sslThresholds: (m.sslThresholds && m.sslThresholds.length > 0) ? m.sslThresholds.join(',') : '30,14,7',
       intervalSeconds: m.intervalSeconds,
       timeoutSeconds: m.timeoutSeconds,
       componentId: m.componentId || '',
@@ -112,9 +122,19 @@ export default function AdminMonitors() {
     setError('')
     try {
       if (editingId) {
-        await api.put(`/monitors/${editingId}`, form)
+        await api.put(`/monitors/${editingId}`, {
+          ...form,
+          sslThresholds: form.type === 'ssl'
+            ? form.sslThresholds.split(',').map(v => parseInt(v.trim(), 10)).filter(v => Number.isFinite(v) && v > 0)
+            : undefined,
+        })
       } else {
-        await api.post('/monitors', form)
+        await api.post('/monitors', {
+          ...form,
+          sslThresholds: form.type === 'ssl'
+            ? form.sslThresholds.split(',').map(v => parseInt(v.trim(), 10)).filter(v => Number.isFinite(v) && v > 0)
+            : undefined,
+        })
       }
       await refetch()
       closeModal()
@@ -270,6 +290,17 @@ export default function AdminMonitors() {
                 placeholder={TYPE_PLACEHOLDERS[form.type]}
               />
             </div>
+            {form.type === 'ssl' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">SSL Alert Thresholds (days)</label>
+                <input
+                  value={form.sslThresholds}
+                  onChange={e => setForm(f => ({ ...f, sslThresholds: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  placeholder="30,14,7"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Component / Subcomponent</label>
               <select
@@ -336,8 +367,15 @@ export default function AdminMonitors() {
             </div>
             {testResult && (
               <div className={`px-3 py-2 rounded-lg text-sm flex items-center justify-between ${testResult.status === 'up' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                <span className="font-medium">Test Result: {testResult.status.toUpperCase()}</span>
-                <span>{testResult.responseTime}ms</span>
+                <span className="font-medium">
+                  Test Result: {testResult.status.toUpperCase()}
+                  {form.type === 'ssl' && testResult.sslWarning ? ' (WARNING)' : ''}
+                </span>
+                <span>
+                  {form.type === 'ssl' && typeof testResult.sslDaysRemaining === 'number'
+                    ? `${testResult.sslDaysRemaining}d left`
+                    : `${testResult.responseTime}ms`}
+                </span>
               </div>
             )}
           </form>

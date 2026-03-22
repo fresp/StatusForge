@@ -24,6 +24,7 @@ var workerCtx context.Context
 var workerCancel context.CancelFunc
 
 var workerWG sync.WaitGroup
+
 // StartWorker starts the monitoring worker
 func StartWorker(ctx context.Context, db *mongo.Database, rdb *redis.Client) {
 	workerCtx, workerCancel = context.WithCancel(ctx)
@@ -90,10 +91,17 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 	start := time.Now()
 	status := models.MonitorUp
 	statusCode := 0
+	sslWarning := false
+	sslDaysRemaining := 0
+	sslTriggeredThreshold := 0
 
 	timeout := time.Duration(mon.TimeoutSeconds) * time.Second
 	if timeout == 0 {
 		timeout = 30 * time.Second
+	}
+	sslThresholds := mon.SSLThresholds
+	if len(sslThresholds) == 0 {
+		sslThresholds = []int{30, 14, 7}
 	}
 
 	switch mon.Type {
@@ -115,36 +123,149 @@ func checkMonitor(db *mongo.Database, mon models.Monitor) {
 		if err := utils.CheckPing(mon.Target, timeout); err != nil {
 			status = models.MonitorDown
 		}
+	case models.MonitorSSL:
+		result, err := utils.CheckSSL(mon.Target, timeout, sslThresholds)
+		if err != nil {
+			status = models.MonitorDown
+		} else {
+			sslWarning = result.Warning
+			sslDaysRemaining = result.DaysRemaining
+			sslTriggeredThreshold = result.TriggeredThreshold
+		}
 	}
 
 	responseTime := time.Since(start).Milliseconds()
 
 	logEntry := models.EnhancedMonitorLog{
-		ID:           primitive.NewObjectID(),
-		MonitorID:    mon.ID,
-		Status:       status,
-		ResponseTime: responseTime,
-		StatusCode:   statusCode,
-		CheckedAt:    time.Now(),
+		ID:                    primitive.NewObjectID(),
+		MonitorID:             mon.ID,
+		Status:                status,
+		SSLWarning:            sslWarning,
+		SSLDaysRemaining:      sslDaysRemaining,
+		SSLTriggeredThreshold: sslTriggeredThreshold,
+		ResponseTime:          responseTime,
+		StatusCode:            statusCode,
+		CheckedAt:             time.Now(),
 	}
 
 	ctx2, cancel2 := context.WithTimeout(workerCtx, 5*time.Second)
 	defer cancel2()
 
 	db.Collection("monitor_logs").InsertOne(ctx2, logEntry)
-	
-	db.Collection("monitors").UpdateOne(ctx2, 
+
+	db.Collection("monitors").UpdateOne(ctx2,
 		bson.M{"_id": mon.ID},
 		bson.M{"$set": bson.M{
-			"lastStatus":    status,
-			"lastCheckedAt": time.Now(),
+			"lastStatus":            status,
+			"sslWarning":            sslWarning,
+			"sslDaysRemaining":      sslDaysRemaining,
+			"sslTriggeredThreshold": sslTriggeredThreshold,
+			"lastCheckedAt":         time.Now(),
 		}},
 	)
-	
+
+	if mon.Type == models.MonitorSSL {
+		applySSLWarningStatus(ctx2, db, mon, sslWarning)
+	}
+
 	updateDailyUptime(db, mon.ID, status)
 	detectOutage(db, mon, status)
 }
 
+func applySSLWarningStatus(ctx context.Context, db *mongo.Database, mon models.Monitor, warning bool) {
+	if !mon.ComponentID.IsZero() {
+		if warning {
+			db.Collection("components").UpdateOne(ctx,
+				bson.M{"_id": mon.ComponentID},
+				bson.M{"$set": bson.M{"status": models.StatusDegradedPerf, "updatedAt": time.Now()}},
+			)
+			return
+		}
+
+		hasActiveOutage := hasActiveOutageForTarget(ctx, db, mon)
+		hasActiveIncident := hasActiveIncidentForTarget(ctx, db, mon)
+		if !shouldRestoreOperational(hasActiveOutage, hasActiveIncident) {
+			return
+		}
+
+		db.Collection("components").UpdateOne(ctx,
+			bson.M{"_id": mon.ComponentID, "status": models.StatusDegradedPerf},
+			bson.M{"$set": bson.M{"status": models.StatusOperational, "updatedAt": time.Now()}},
+		)
+		return
+	}
+
+	if !mon.SubComponentID.IsZero() {
+		if warning {
+			db.Collection("subcomponents").UpdateOne(ctx,
+				bson.M{"_id": mon.SubComponentID},
+				bson.M{"$set": bson.M{"status": models.StatusDegradedPerf, "updated_at": time.Now()}},
+			)
+			return
+		}
+
+		hasActiveOutage := hasActiveOutageForTarget(ctx, db, mon)
+		hasActiveIncident := hasActiveIncidentForTarget(ctx, db, mon)
+		if !shouldRestoreOperational(hasActiveOutage, hasActiveIncident) {
+			return
+		}
+
+		db.Collection("subcomponents").UpdateOne(ctx,
+			bson.M{"_id": mon.SubComponentID, "status": models.StatusDegradedPerf},
+			bson.M{"$set": bson.M{"status": models.StatusOperational, "updated_at": time.Now()}},
+		)
+	}
+}
+
+func shouldRestoreOperational(hasActiveOutage bool, hasActiveIncident bool) bool {
+	return !hasActiveOutage && !hasActiveIncident
+}
+
+func hasActiveOutageForTarget(ctx context.Context, db *mongo.Database, mon models.Monitor) bool {
+	orConditions := make([]bson.M, 0, 2)
+	if !mon.ComponentID.IsZero() {
+		orConditions = append(orConditions, bson.M{"componentId": mon.ComponentID})
+	}
+	if !mon.SubComponentID.IsZero() {
+		orConditions = append(orConditions, bson.M{"subComponentId": mon.SubComponentID})
+	}
+
+	if len(orConditions) == 0 {
+		return false
+	}
+
+	filter := bson.M{
+		"status": models.OutageActive,
+		"$or":    orConditions,
+	}
+
+	err := db.Collection("outages").FindOne(ctx, filter).Err()
+	return err == nil
+}
+
+func hasActiveIncidentForTarget(ctx context.Context, db *mongo.Database, mon models.Monitor) bool {
+	componentID := mon.ComponentID
+	if componentID.IsZero() && !mon.SubComponentID.IsZero() {
+		var subComp models.SubComponent
+		err := db.Collection("subcomponents").FindOne(ctx, bson.M{"_id": mon.SubComponentID}).Decode(&subComp)
+		if err != nil {
+			return false
+		}
+		componentID = subComp.ComponentID
+	}
+
+	if componentID.IsZero() {
+		return false
+	}
+
+	filter := bson.M{
+		"affectedComponents": bson.M{"$in": []primitive.ObjectID{componentID}},
+		"status":             bson.M{"$ne": models.IncidentResolved},
+	}
+
+	err := db.Collection("incidents").FindOne(ctx, filter).Err()
+	return err == nil
+}
 
 func updateDailyUptime(db *mongo.Database, monitorID primitive.ObjectID, status models.MonitorLogStatus) {
 	ctx, cancel := context.WithTimeout(workerCtx, 5*time.Second)

@@ -3,15 +3,16 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"sort"
 	"time"
 
+	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/StatusForge/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"github.com/fresp/StatusForge/internal/models"
-	"github.com/fresp/StatusForge/internal/utils"
 )
 
 func GetMonitors(db *mongo.Database) gin.HandlerFunc {
@@ -45,6 +46,7 @@ func CreateMonitor(db *mongo.Database) gin.HandlerFunc {
 			Name            string             `json:"name" binding:"required"`
 			Type            models.MonitorType `json:"type" binding:"required"`
 			Target          string             `json:"target" binding:"required"`
+			SSLThresholds   []int              `json:"sslThresholds"`
 			IntervalSeconds int                `json:"intervalSeconds"`
 			TimeoutSeconds  int                `json:"timeoutSeconds"`
 			ComponentID     string             `json:"componentId"`
@@ -95,6 +97,7 @@ func CreateMonitor(db *mongo.Database) gin.HandlerFunc {
 			Name:            req.Name,
 			Type:            req.Type,
 			Target:          req.Target,
+			SSLThresholds:   sanitizeSSLThresholds(req.SSLThresholds),
 			IntervalSeconds: req.IntervalSeconds,
 			TimeoutSeconds:  req.TimeoutSeconds,
 			ComponentID:     compID,
@@ -126,6 +129,7 @@ func UpdateMonitor(db *mongo.Database) gin.HandlerFunc {
 			Name            string             `json:"name" binding:"required"`
 			Type            models.MonitorType `json:"type" binding:"required"`
 			Target          string             `json:"target" binding:"required"`
+			SSLThresholds   []int              `json:"sslThresholds"`
 			IntervalSeconds int                `json:"intervalSeconds"`
 			TimeoutSeconds  int                `json:"timeoutSeconds"`
 			ComponentID     string             `json:"componentId"`
@@ -174,6 +178,7 @@ func UpdateMonitor(db *mongo.Database) gin.HandlerFunc {
 				"name":            req.Name,
 				"type":            req.Type,
 				"target":          req.Target,
+				"sslThresholds":   sanitizeSSLThresholds(req.SSLThresholds),
 				"intervalSeconds": req.IntervalSeconds,
 				"timeoutSeconds":  req.TimeoutSeconds,
 				"componentId":     compID,
@@ -204,6 +209,7 @@ func TestMonitor() gin.HandlerFunc {
 		var req struct {
 			Type           models.MonitorType `json:"type" binding:"required"`
 			Target         string             `json:"target" binding:"required"`
+			SSLThresholds  []int              `json:"sslThresholds"`
 			TimeoutSeconds int                `json:"timeoutSeconds"`
 		}
 
@@ -220,6 +226,10 @@ func TestMonitor() gin.HandlerFunc {
 		start := time.Now()
 		status := models.MonitorUp
 		statusCode := 0
+		sslWarning := false
+		sslDaysRemaining := 0
+		sslTriggeredThreshold := 0
+		thresholds := sanitizeSSLThresholds(req.SSLThresholds)
 
 		switch req.Type {
 		case models.MonitorHTTP:
@@ -240,16 +250,57 @@ func TestMonitor() gin.HandlerFunc {
 			if err := utils.CheckPing(req.Target, timeout); err != nil {
 				status = models.MonitorDown
 			}
+		case models.MonitorSSL:
+			result, err := utils.CheckSSL(req.Target, timeout, thresholds)
+			if err != nil {
+				status = models.MonitorDown
+			} else {
+				sslWarning = result.Warning
+				sslDaysRemaining = result.DaysRemaining
+				sslTriggeredThreshold = result.TriggeredThreshold
+			}
 		}
 
 		responseTime := time.Since(start).Milliseconds()
 
 		c.JSON(http.StatusOK, gin.H{
-			"status":       status,
-			"statusCode":   statusCode,
-			"responseTime": responseTime,
+			"status":                status,
+			"statusCode":            statusCode,
+			"responseTime":          responseTime,
+			"sslWarning":            sslWarning,
+			"sslDaysRemaining":      sslDaysRemaining,
+			"sslTriggeredThreshold": sslTriggeredThreshold,
 		})
 	}
+}
+
+func sanitizeSSLThresholds(thresholds []int) []int {
+	if len(thresholds) == 0 {
+		return []int{30, 14, 7}
+	}
+
+	valid := make([]int, 0, len(thresholds))
+	seen := map[int]bool{}
+	for _, threshold := range thresholds {
+		if threshold <= 0 {
+			continue
+		}
+		if seen[threshold] {
+			continue
+		}
+		seen[threshold] = true
+		valid = append(valid, threshold)
+	}
+
+	if len(valid) == 0 {
+		return []int{30, 14, 7}
+	}
+
+	sort.Slice(valid, func(i, j int) bool {
+		return valid[i] > valid[j]
+	})
+
+	return valid
 }
 
 func GetMonitorLogs(db *mongo.Database) gin.HandlerFunc {

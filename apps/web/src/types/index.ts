@@ -10,7 +10,7 @@ export type ComponentStatus =
 export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
 export type IncidentImpact = 'none' | 'minor' | 'major' | 'critical'
 export type MaintenanceStatus = 'scheduled' | 'in_progress' | 'completed'
-export type MonitorType = 'http' | 'tcp' | 'dns' | 'ping'
+export type MonitorType = 'http' | 'tcp' | 'dns' | 'ping' | 'ssl'
 export type MonitorLogStatus = 'up' | 'down'
 
 export interface Component {
@@ -81,11 +81,15 @@ export interface Monitor {
   name: string
   type: MonitorType
   target: string
+  sslThresholds?: number[]
   intervalSeconds: number
   timeoutSeconds: number
   componentId: string
   subComponentId?: string
   lastStatus?: MonitorLogStatus
+  sslWarning?: boolean
+  sslDaysRemaining?: number
+  sslTriggeredThreshold?: number
   lastCheckedAt?: string
   createdAt: string
 }

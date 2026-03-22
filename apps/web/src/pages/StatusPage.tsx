@@ -240,7 +240,7 @@ export default function StatusPage() {
             <h1 className="text-3xl font-bold">{settings.branding.siteName}</h1>
           </div>
           <div className="flex items-center gap-3 text-xl">
-            <CheckCircle className="w-7 h-7" />
+            <StatusIcon status={overallStatus} />
             <span>{getOverallStatusLabel(overallStatus as any)}</span>
           </div>
           {activeIncidents.length > 0 && (
