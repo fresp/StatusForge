@@ -3,31 +3,9 @@ import { CheckCircle, AlertTriangle, AlertCircle, XCircle, Wrench, ChevronDown, 
 import { useApi } from '../hooks/useApi'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { StatusSummary, ComponentWithSubs, Incident, Maintenance, StatusPageSettings } from '../types'
-import { STATUS_COLORS, STATUS_LABELS, STATUS_TEXT_COLORS, getOverallStatusLabel, formatDate, formatDateShort, INCIDENT_STATUS_LABELS, INCIDENT_IMPACT_LABELS } from '../lib/utils'
+import { STATUS_LABELS, getOverallStatusLabel, formatDate, formatDateShort, INCIDENT_STATUS_LABELS, INCIDENT_IMPACT_LABELS } from '../lib/utils'
 import { IncidentTimeline } from '../components/IncidentTimeline'
-
-type ThemePalette = StatusPageSettings['theme']['light']
-
-const THEME_PRESETS: Record<string, { light: ThemePalette; dark: ThemePalette }> = {
-  default: {
-    light: { primaryColor: '#16a34a', backgroundColor: '#f9fafb', textColor: '#111827', accentColor: '#0ea5e9' },
-    dark: { primaryColor: '#22c55e', backgroundColor: '#0b1220', textColor: '#e5e7eb', accentColor: '#38bdf8' },
-  },
-  ocean: {
-    light: { primaryColor: '#0ea5e9', backgroundColor: '#f0f9ff', textColor: '#0f172a', accentColor: '#14b8a6' },
-    dark: { primaryColor: '#38bdf8', backgroundColor: '#082f49', textColor: '#e0f2fe', accentColor: '#2dd4bf' },
-  },
-  graphite: {
-    light: { primaryColor: '#334155', backgroundColor: '#f8fafc', textColor: '#0f172a', accentColor: '#6366f1' },
-    dark: { primaryColor: '#64748b', backgroundColor: '#020617', textColor: '#e2e8f0', accentColor: '#818cf8' },
-  },
-}
-
-const FONT_SIZE_MAP: Record<StatusPageSettings['theme']['typography']['fontScale'], string> = {
-  sm: '0.925rem',
-  md: '1rem',
-  lg: '1.075rem',
-}
+import { loadThemePresetStylesheet, getThemePresets, DEFAULT_THEME_PRESET } from '../lib/themePresetLoader'
 
 const DEFAULT_SETTINGS: StatusPageSettings = {
   head: {
@@ -44,27 +22,7 @@ const DEFAULT_SETTINGS: StatusPageSettings = {
     heroImageUrl: '',
   },
   theme: {
-    preset: 'default',
-    mode: 'system',
-    light: {
-      primaryColor: '#16a34a',
-      backgroundColor: '#f9fafb',
-      textColor: '#111827',
-      accentColor: '#0ea5e9',
-    },
-    dark: {
-      primaryColor: '#22c55e',
-      backgroundColor: '#0b1220',
-      textColor: '#e5e7eb',
-      accentColor: '#38bdf8',
-    },
-    typography: {
-      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      fontScale: 'md',
-    },
-  },
-  layout: {
-    variant: 'classic',
+    preset: DEFAULT_THEME_PRESET,
   },
   footer: {
     text: '',
@@ -80,17 +38,8 @@ function normalizeSettings(settings?: StatusPageSettings | null): StatusPageSett
     return DEFAULT_SETTINGS
   }
 
-  const presetKey = settings.theme?.preset && THEME_PRESETS[settings.theme.preset] ? settings.theme.preset : 'default'
-  const preset = THEME_PRESETS[presetKey]
-  const mode = settings.theme?.mode === 'light' || settings.theme?.mode === 'dark' || settings.theme?.mode === 'system'
-    ? settings.theme.mode
-    : DEFAULT_SETTINGS.theme.mode
-  const fontScale = settings.theme?.typography?.fontScale === 'sm' || settings.theme?.typography?.fontScale === 'md' || settings.theme?.typography?.fontScale === 'lg'
-    ? settings.theme.typography.fontScale
-    : DEFAULT_SETTINGS.theme.typography.fontScale
-  const layoutVariant = settings.layout?.variant === 'classic' || settings.layout?.variant === 'compact' || settings.layout?.variant === 'minimal' || settings.layout?.variant === 'cards'
-    ? settings.layout.variant
-    : 'classic'
+  const preset = settings.theme?.preset?.trim() || DEFAULT_THEME_PRESET
+  const normalizedPreset = preset.endsWith('.css') ? preset : `${preset}.css`
 
   return {
     head: {
@@ -107,27 +56,8 @@ function normalizeSettings(settings?: StatusPageSettings | null): StatusPageSett
       heroImageUrl: settings.branding?.heroImageUrl ?? '',
     },
     theme: {
-      preset: presetKey,
-      mode,
-      light: {
-        primaryColor: settings.theme?.light?.primaryColor || preset.light.primaryColor,
-        backgroundColor: settings.theme?.light?.backgroundColor || preset.light.backgroundColor,
-        textColor: settings.theme?.light?.textColor || preset.light.textColor,
-        accentColor: settings.theme?.light?.accentColor || preset.light.accentColor,
-      },
-      dark: {
-        primaryColor: settings.theme?.dark?.primaryColor || preset.dark.primaryColor,
-        backgroundColor: settings.theme?.dark?.backgroundColor || preset.dark.backgroundColor,
-        textColor: settings.theme?.dark?.textColor || preset.dark.textColor,
-        accentColor: settings.theme?.dark?.accentColor || preset.dark.accentColor,
-      },
-      typography: {
-        fontFamily: settings.theme?.typography?.fontFamily ?? DEFAULT_SETTINGS.theme.typography.fontFamily,
-        fontScale,
-      },
-    },
-    layout: {
-      variant: layoutVariant,
+      preset: normalizedPreset,
+      appliedPreset: settings.theme?.appliedPreset,
     },
     footer: {
       text: settings.footer?.text ?? '',
@@ -202,15 +132,35 @@ function upsertCustomCss(css: string) {
   styleEl.textContent = css
 }
 
+function getStatusToken(status: string): string {
+  switch (status) {
+    case 'operational':
+      return '--status-operational'
+    case 'degraded_performance':
+      return '--status-degraded'
+    case 'partial_outage':
+      return '--status-partial'
+    case 'major_outage':
+      return '--status-major'
+    case 'maintenance':
+      return '--status-maintenance'
+    default:
+      return '--status-operational'
+  }
+}
+
+type ThemeVariableStyle = React.CSSProperties & Record<`--${string}`, string>
+
 function StatusIcon({ status }: { status: string }) {
   const cls = 'w-5 h-5'
+  const color = `var(${getStatusToken(status)})`
   switch (status) {
-    case 'operational': return <CheckCircle className={`${cls} text-green-500`} />
-    case 'degraded_performance': return <AlertTriangle className={`${cls} text-yellow-500`} />
-    case 'partial_outage': return <AlertCircle className={`${cls} text-orange-500`} />
-    case 'major_outage': return <XCircle className={`${cls} text-red-500`} />
-    case 'maintenance': return <Wrench className={`${cls} text-blue-500`} />
-    default: return <CheckCircle className={`${cls} text-green-500`} />
+    case 'operational': return <CheckCircle className={cls} style={{ color }} />
+    case 'degraded_performance': return <AlertTriangle className={cls} style={{ color }} />
+    case 'partial_outage': return <AlertCircle className={cls} style={{ color }} />
+    case 'major_outage': return <XCircle className={cls} style={{ color }} />
+    case 'maintenance': return <Wrench className={cls} style={{ color }} />
+    default: return <CheckCircle className={cls} style={{ color: 'var(--status-operational)' }} />
   }
 }
 
@@ -220,8 +170,11 @@ function UptimeBar({ bars }: { bars: { date: string; uptimePercent: number; stat
       {bars.map((bar, i) => (
         <div
           key={i}
-          className={`flex-1 rounded-sm ${STATUS_COLORS[bar.status as keyof typeof STATUS_COLORS] || 'bg-green-500'} opacity-80 hover:opacity-100 transition-opacity cursor-pointer`}
-          style={{ height: `${Math.max(20, bar.uptimePercent / 100 * 32)}px` }}
+          className="flex-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+          style={{
+            backgroundColor: `var(${getStatusToken(bar.status)})`,
+            height: `${Math.max(20, bar.uptimePercent / 100 * 32)}px`,
+          }}
           title={`${bar.date}: ${bar.uptimePercent.toFixed(2)}% uptime`}
         />
       ))}
@@ -259,20 +212,6 @@ export default function StatusPage() {
   const resolvedIncidents = incidentData?.resolved || []
   const upcomingMaintenance = maintenanceData?.filter(m => m.status !== 'completed') || []
   const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set())
-  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return false
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
-
-  const headerBg: Record<string, string> = {
-    operational: 'bg-green-600',
-    degraded_performance: 'bg-yellow-500',
-    partial_outage: 'bg-orange-500',
-    major_outage: 'bg-red-600',
-    maintenance: 'bg-blue-600',
-  }
 
   useEffect(() => {
     document.title = settings.head.title
@@ -284,31 +223,18 @@ export default function StatusPage() {
   }, [settings])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return
-    }
+    const presets = getThemePresets().presets
+    loadThemePresetStylesheet(settings.theme.preset, presets).catch(() => {})
+  }, [settings.theme.preset])
 
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const listener = (event: MediaQueryListEvent) => {
-      setSystemPrefersDark(event.matches)
-    }
+  const headerStatusToken = getStatusToken(overallStatus)
 
-    media.addEventListener('change', listener)
-    return () => media.removeEventListener('change', listener)
-  }, [])
-
-  const effectiveMode = settings.theme.mode === 'system'
-    ? (systemPrefersDark ? 'dark' : 'light')
-    : settings.theme.mode
-  const activePalette = effectiveMode === 'dark' ? settings.theme.dark : settings.theme.light
-
-  const pageStyle: React.CSSProperties = {
-    backgroundColor: activePalette.backgroundColor,
-    color: activePalette.textColor,
-    fontFamily: settings.theme.typography.fontFamily,
-    fontSize: FONT_SIZE_MAP[settings.theme.typography.fontScale],
+  const pageStyle: ThemeVariableStyle = {
+    backgroundColor: 'var(--bg)',
+    color: 'var(--text)',
+    fontFamily: 'var(--font-family)',
     backgroundImage: settings.branding.backgroundImageUrl
-      ? `linear-gradient(rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.16)), url(${settings.branding.backgroundImageUrl})`
+      ? `linear-gradient(var(--bg-image-overlay), var(--bg-image-overlay)), url(${settings.branding.backgroundImageUrl})`
       : undefined,
     backgroundSize: settings.branding.backgroundImageUrl ? 'cover' : undefined,
     backgroundAttachment: settings.branding.backgroundImageUrl ? 'fixed' : undefined,
@@ -316,49 +242,54 @@ export default function StatusPage() {
   }
 
   const headerStyle: React.CSSProperties = {
-    boxShadow: `inset 0 -3px 0 ${activePalette.accentColor}`,
+    backgroundColor: `var(${headerStatusToken})`,
+    color: 'var(--on-primary)',
+    boxShadow: 'inset 0 -3px 0 var(--color-accent)',
   }
 
-  const contentClassName = settings.layout.variant === 'compact'
-    ? 'max-w-3xl mx-auto px-4 py-6 space-y-6'
-    : settings.layout.variant === 'minimal'
-      ? 'max-w-3xl mx-auto px-3 py-5 space-y-5'
-      : settings.layout.variant === 'cards'
-        ? 'max-w-5xl mx-auto px-4 py-8 space-y-8'
-        : 'max-w-4xl mx-auto px-4 py-8 space-y-8'
+  const contentClassName = 'max-w-4xl mx-auto px-4 py-8 space-y-8'
 
   const cardSurfaceStyle: React.CSSProperties = {
-    backgroundColor: effectiveMode === 'dark' ? 'rgba(15,23,42,0.85)' : 'rgba(255,255,255,0.95)',
-    color: activePalette.textColor,
-    borderColor: activePalette.accentColor,
+    backgroundColor: 'var(--surface)',
+    color: 'var(--text)',
+    borderColor: 'var(--border)',
   }
 
   const sectionTitleStyle: React.CSSProperties = {
-    color: activePalette.textColor,
+    color: 'var(--text)',
   }
 
-  const mutedTextColor = effectiveMode === 'dark' ? 'rgba(229, 231, 235, 0.78)' : 'rgba(55, 65, 81, 0.85)'
-  const subtleTextColor = effectiveMode === 'dark' ? 'rgba(229, 231, 235, 0.62)' : 'rgba(107, 114, 128, 0.95)'
+  const mutedTextColor = 'var(--text-muted)'
+  const subtleTextColor = 'var(--text-subtle)'
   const incidentSurfaceStyle: React.CSSProperties = {
-    backgroundColor: effectiveMode === 'dark' ? 'rgba(127, 29, 29, 0.26)' : 'rgba(254, 242, 242, 0.96)',
-    borderColor: effectiveMode === 'dark' ? '#f87171' : '#fecaca',
-    color: activePalette.textColor,
+    backgroundColor: 'var(--surface-incident)',
+    borderColor: 'var(--border-incident)',
+    color: 'var(--text)',
   }
   const maintenanceSurfaceStyle: React.CSSProperties = {
-    backgroundColor: effectiveMode === 'dark' ? 'rgba(30, 58, 138, 0.24)' : 'rgba(239, 246, 255, 0.97)',
-    borderColor: effectiveMode === 'dark' ? '#60a5fa' : '#bfdbfe',
-    color: activePalette.textColor,
+    backgroundColor: 'var(--surface-maintenance)',
+    borderColor: 'var(--border-maintenance)',
+    color: 'var(--text)',
   }
   const uptimeSurfaceStyle: React.CSSProperties = {
-    backgroundColor: effectiveMode === 'dark' ? 'rgba(15, 23, 42, 0.55)' : 'rgba(249, 250, 251, 0.96)',
-    borderColor: activePalette.accentColor,
+    backgroundColor: 'var(--surface-uptime)',
+    borderColor: 'var(--border)',
+  }
+  const heroImageStyle: React.CSSProperties = {
+    borderColor: 'var(--hero-image-border)',
+  }
+  const componentHeaderStyle: React.CSSProperties = {
+    borderColor: 'var(--color-accent)',
+  }
+  const subComponentDividerStyle: React.CSSProperties = {
+    borderColor: 'var(--subcomponent-divider)',
   }
 
   return (
     <div className="min-h-screen" style={pageStyle}>
       {/* Header */}
       <div
-        className={`${headerBg[overallStatus] || 'bg-green-600'} text-white py-12 px-4`}
+        className="py-12 px-4"
         style={headerStyle}
       >
         <div className="max-w-4xl mx-auto">
@@ -376,7 +307,8 @@ export default function StatusPage() {
             <img
               src={settings.branding.heroImageUrl}
               alt="Status page hero"
-              className="w-full max-h-48 object-cover rounded-xl border border-white/30 mb-4"
+              className="w-full max-h-48 object-cover rounded-xl border mb-4"
+              style={heroImageStyle}
             />
           )}
           <div className="flex items-center gap-3 text-xl">
@@ -384,7 +316,7 @@ export default function StatusPage() {
             <span>{getOverallStatusLabel(overallStatus as any)}</span>
           </div>
           {activeIncidents.length > 0 && (
-            <p className="mt-2 text-white/80 text-sm">{activeIncidents.length} active incident{activeIncidents.length > 1 ? 's' : ''}</p>
+            <p className="mt-2 text-sm" style={{ color: 'var(--on-primary-subtle)' }}>{activeIncidents.length} active incident{activeIncidents.length > 1 ? 's' : ''}</p>
           )}
         </div>
       </div>
@@ -397,7 +329,7 @@ export default function StatusPage() {
           return (
             <div key={incident.id} className="border rounded-lg p-4" style={incidentSurfaceStyle}>
               <div className="flex items-start gap-3">
-                <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <XCircle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--status-major)' }} />
                 <div className="flex-1">
                   <div className="flex items-start justify-between">
                     <div>
@@ -420,7 +352,8 @@ export default function StatusPage() {
                         }
                         return next
                       })}
-                      className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                      className="flex-shrink-0 transition-colors"
+                      style={{ color: 'var(--text-subtle)' }}
                     >
                       {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                     </button>
@@ -436,7 +369,7 @@ export default function StatusPage() {
         {upcomingMaintenance.map(m => (
           <div key={m.id} className="border rounded-lg p-4" style={maintenanceSurfaceStyle}>
             <div className="flex items-start gap-3">
-              <Wrench className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+              <Wrench className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--status-maintenance)' }} />
               <div>
                 <h3 className="font-semibold">{m.title}</h3>
                 <p className="text-sm mt-1" style={{ color: mutedTextColor }}>{m.description}</p>
@@ -454,17 +387,17 @@ export default function StatusPage() {
         {(components || []).map(comp => (
           <div
             key={comp.id}
-            className={`${settings.layout.variant === 'cards' ? 'rounded-2xl shadow-lg' : 'rounded-xl shadow-sm'} border overflow-hidden`}
+            className="rounded-xl shadow-sm border overflow-hidden"
             style={cardSurfaceStyle}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100" style={{ borderColor: activePalette.accentColor }}>
+            <div className="flex items-center justify-between px-6 py-4 border-b" style={componentHeaderStyle}>
               <div>
                 <h2 className="text-lg font-semibold" style={sectionTitleStyle}>{comp.name}</h2>
                 {comp.description && <p className="text-sm mt-0.5" style={{ color: subtleTextColor }}>{comp.description}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <StatusIcon status={comp.status} />
-                <span className={`text-sm font-medium ${STATUS_TEXT_COLORS[comp.status]}`}>
+                <span className="text-sm font-medium" style={{ color: `var(${getStatusToken(comp.status)})` }}>
                   {STATUS_LABELS[comp.status]}
                 </span>
               </div>
@@ -472,13 +405,13 @@ export default function StatusPage() {
 
             {/* SubComponents */}
             {comp.subComponents && comp.subComponents.length > 0 && (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y" style={subComponentDividerStyle}>
                 {comp.subComponents.map(sub => (
                   <div key={sub.id} className="flex items-center justify-between px-6 py-3">
                     <span className="text-sm pl-4" style={{ color: mutedTextColor }}>{sub.name}</span>
                     <div className="flex items-center gap-2">
                       <StatusIcon status={sub.status} />
-                      <span className={`text-xs font-medium ${STATUS_TEXT_COLORS[sub.status]}`}>
+                      <span className="text-xs font-medium" style={{ color: `var(${getStatusToken(sub.status)})` }}>
                         {STATUS_LABELS[sub.status]}
                       </span>
                     </div>
@@ -523,7 +456,7 @@ export default function StatusPage() {
                         <p className="text-sm mt-1" style={{ color: mutedTextColor }}>{incident.description}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                        <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: 'var(--status-resolved-bg)', color: 'var(--status-resolved-text)' }}>
                           Resolved
                         </span>
                         <button
@@ -536,7 +469,8 @@ export default function StatusPage() {
                             }
                             return next
                           })}
-                          className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                          className="flex-shrink-0 transition-colors"
+                          style={{ color: 'var(--text-subtle)' }}
                         >
                           {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                         </button>
@@ -556,7 +490,7 @@ export default function StatusPage() {
         )}
 
         {/* Footer */}
-        <div className="text-center py-8 border-t" style={{ borderColor: activePalette.accentColor }}>
+         <div className="text-center py-8 border-t" style={{ borderColor: 'var(--border)' }}>
           {settings.footer.text && (
             <p className="text-sm mb-1" style={{ color: mutedTextColor }}>{settings.footer.text}</p>
           )}

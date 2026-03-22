@@ -1,0 +1,77 @@
+:root {
+  --primary: #0ea5e9;
+  --bg: #f0f9ff;
+  --text: #0f172a;
+  --color-accent: #14b8a6;
+  --font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --surface: rgba(240, 249, 255, 0.95);
+  --border: #14b8a6;
+  --on-primary: #ecfeff;
+  --on-primary-subtle: #164e63;
+  --text-muted: #155e75;
+  --text-subtle: #0891b2;
+  --surface-incident: #fff1f2;
+  --border-incident: #fecaca;
+  --surface-maintenance: #fef9c3;
+  --border-maintenance: #fde047;
+  --surface-uptime: #e0f2fe;
+  --hero-image-border: #bae6fd;
+  --subcomponent-divider: #e0f2fe;
+  --status-operational: #0f766e;
+  --status-degraded: #d97706;
+  --status-partial: #f97316;
+  --status-major: #e11d48;
+  --status-maintenance: #2563eb;
+  --status-resolved-bg: #ccfbf1;
+  --status-resolved-text: #115e59;
+  --bg-image-overlay: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"],
+.dark {
+  --primary: #38bdf8;
+  --bg: #082f49;
+  --text: #e0f2fe;
+  --color-accent: #2dd4bf;
+  --surface: rgba(8, 47, 73, 0.9);
+  --border: #14b8a6;
+  --on-primary: #052e16;
+  --on-primary-subtle: #dcfce7;
+  --text-muted: #7dd3fc;
+  --text-subtle: #38bdf8;
+  --surface-incident: #450a0a;
+  --border-incident: #7f1d1d;
+  --surface-maintenance: #1e1b4b;
+  --border-maintenance: #312e81;
+  --surface-uptime: #0f172a;
+  --hero-image-border: #334155;
+  --subcomponent-divider: #1e293b;
+  --status-resolved-bg: #064e3b;
+  --status-resolved-text: #6ee7b7;
+  --bg-image-overlay: rgba(0, 0, 0, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #38bdf8;
+    --bg: #082f49;
+    --text: #e0f2fe;
+    --color-accent: #2dd4bf;
+    --surface: rgba(8, 47, 73, 0.9);
+    --border: #14b8a6;
+    --on-primary: #052e16;
+    --on-primary-subtle: #dcfce7;
+    --text-muted: #7dd3fc;
+    --text-subtle: #38bdf8;
+    --surface-incident: #450a0a;
+    --border-incident: #7f1d1d;
+    --surface-maintenance: #1e1b4b;
+    --border-maintenance: #312e81;
+    --surface-uptime: #0f172a;
+    --hero-image-border: #334155;
+    --subcomponent-divider: #1e293b;
+    --status-resolved-bg: #064e3b;
+    --status-resolved-text: #6ee7b7;
+    --bg-image-overlay: rgba(0, 0, 0, 0.7);
+  }
+}

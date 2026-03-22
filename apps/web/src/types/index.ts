@@ -228,25 +228,54 @@ export interface StatusPageSettings {
   }
   theme: {
     preset: string
-    mode: 'light' | 'dark' | 'system'
-    light: {
-      primaryColor: string
-      backgroundColor: string
-      textColor: string
-      accentColor: string
+    appliedPreset?: string
+    mode?: 'light' | 'dark' | 'system'
+    overrides?: {
+      light?: {
+        primaryColor?: string
+        backgroundColor?: string
+        textColor?: string
+        accentColor?: string
+      }
+      dark?: {
+        primaryColor?: string
+        backgroundColor?: string
+        textColor?: string
+        accentColor?: string
+      }
+      typography?: {
+        fontFamily?: string
+        fontScale?: 'sm' | 'md' | 'lg'
+      }
+      ui?: {
+        cardBackground?: string
+        borderColor?: string
+      }
     }
-    dark: {
-      primaryColor: string
-      backgroundColor: string
-      textColor: string
-      accentColor: string
-    }
-    typography: {
-      fontFamily: string
-      fontScale: 'sm' | 'md' | 'lg'
+    resolved?: {
+      light: {
+        primaryColor: string
+        backgroundColor: string
+        textColor: string
+        accentColor: string
+      }
+      dark: {
+        primaryColor: string
+        backgroundColor: string
+        textColor: string
+        accentColor: string
+      }
+      typography: {
+        fontFamily: string
+        fontScale: 'sm' | 'md' | 'lg'
+      }
+      ui: {
+        cardBackground: string
+        borderColor: string
+      }
     }
   }
-  layout: {
+  layout?: {
     variant: 'classic' | 'compact' | 'minimal' | 'cards'
   }
   footer: {
@@ -256,6 +285,15 @@ export interface StatusPageSettings {
   customCss: string
   updatedAt: string
   createdAt: string
+}
+
+export interface StatusPageThemePresetSummary {
+  key: string
+  label: string
+}
+
+export interface StatusPageThemePresetCatalog {
+  presets: StatusPageThemePresetSummary[]
 }
 
 export interface StatusPageSettingsPatchRequest {
@@ -291,6 +329,10 @@ export interface StatusPageSettingsPatchRequest {
       fontFamily?: string
       fontScale?: 'sm' | 'md' | 'lg'
     }
+    ui?: {
+      cardBackground?: string
+      borderColor?: string
+    }
   }
   layout?: {
     variant?: 'classic' | 'compact' | 'minimal' | 'cards'
@@ -301,6 +343,7 @@ export interface StatusPageSettingsPatchRequest {
   }
   customCss?: string
 }
+
 export interface WebhookChannel {
   id: string
   name: string
