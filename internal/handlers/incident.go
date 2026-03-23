@@ -25,6 +25,23 @@ func GetIncidents(db *mongo.Database) gin.HandlerFunc {
 			filter["status"] = status
 		}
 
+		startDate, endDate, err := parseDateRangeParams(c.Query("start_date"), c.Query("end_date"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if startDate != nil || endDate != nil {
+			createdAtFilter := bson.M{}
+			if startDate != nil {
+				createdAtFilter["$gte"] = *startDate
+			}
+			if endDate != nil {
+				createdAtFilter["$lt"] = *endDate
+			}
+			filter["createdAt"] = createdAtFilter
+		}
+
 		cursor, err := db.Collection("incidents").Find(ctx, filter,
 			options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
 		if err != nil {

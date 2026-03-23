@@ -153,7 +153,7 @@ Administrators can customize the public status page from the admin settings scre
 - **Palette editing**: Separate light and dark palettes for primary, background, text, and accent colors.
 - **Typography**: Configurable font family and font scale (`sm`, `md`, `lg`).
 - **Layout variants**: `classic`, `compact`, `minimal`, and `cards` layouts for the public page.
-- **Incident history UX**: The public status page surfaces a rolling 7-day incident snapshot with empty-day states, and `/history` exposes the full archive grouped by year, quarter, and month.
+- **Incident history UX**: The public status page surfaces a rolling 7-day incident snapshot by default, and `/history` exposes the archive through quarter navigation with month-grouped incident lists and empty-month states.
 - **Preview tooling**: The admin console includes a live preview before saving changes.
 - **Validation**: Backend validation enforces `http(s)` URLs for branding assets and `#RRGGBB` hex colors for theme values.
 

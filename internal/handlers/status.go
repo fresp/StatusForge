@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/fresp/StatusForge/internal/models"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"github.com/fresp/StatusForge/internal/models"
 )
 
 type ComponentWithSubs struct {
@@ -281,7 +281,7 @@ func getLastIncidentForComponent(ctx context.Context, db *mongo.Database, compID
 	var incident models.Incident
 	err := db.Collection("incidents").FindOne(ctx,
 		inFilter,
-		options.FindOne().SetSort(bson.D{{"createdAt", -1}})).Decode(&incident)
+		options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})).Decode(&incident)
 
 	// If no incident was found, return nil
 	if err != nil {
@@ -325,6 +325,83 @@ func GetStatusIncidents(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
+
+		startDate, endDate, err := parseDateRangeParams(c.Query("start_date"), c.Query("end_date"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if startDate == nil && endDate == nil {
+			defaultStartDate := time.Now().AddDate(0, 0, -7)
+			startDate = &defaultStartDate
+		}
+
+		if startDate != nil || endDate != nil {
+			dateFilter := bson.M{}
+			if startDate != nil {
+				dateFilter["$gte"] = *startDate
+			}
+			if endDate != nil {
+				dateFilter["$lt"] = *endDate
+			}
+
+			cursor, findErr := db.Collection("incidents").Find(ctx,
+				bson.M{"createdAt": dateFilter},
+				options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
+			)
+			if findErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": findErr.Error()})
+				return
+			}
+
+			var incidents []models.Incident
+			cursor.All(ctx, &incidents)
+			cursor.Close(ctx)
+
+			if incidents == nil {
+				incidents = []models.Incident{}
+			}
+
+			allIDs := make([]primitive.ObjectID, 0, len(incidents))
+			for _, inc := range incidents {
+				allIDs = append(allIDs, inc.ID)
+			}
+
+			updatesMap, updateErr := fetchIncidentUpdates(ctx, db, allIDs)
+			if updateErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": updateErr.Error()})
+				return
+			}
+
+			activeWithUpdates := make([]models.IncidentWithUpdates, 0, len(incidents))
+			resolvedWithUpdates := make([]models.IncidentWithUpdates, 0, len(incidents))
+			for _, inc := range incidents {
+				incidentWithUpdates := models.IncidentWithUpdates{
+					Incident: inc,
+					Updates:  updatesMap[inc.ID],
+				}
+
+				if inc.Status == models.IncidentResolved {
+					resolvedWithUpdates = append(resolvedWithUpdates, incidentWithUpdates)
+				} else {
+					activeWithUpdates = append(activeWithUpdates, incidentWithUpdates)
+				}
+			}
+
+			if activeWithUpdates == nil {
+				activeWithUpdates = []models.IncidentWithUpdates{}
+			}
+			if resolvedWithUpdates == nil {
+				resolvedWithUpdates = []models.IncidentWithUpdates{}
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"active":   activeWithUpdates,
+				"resolved": resolvedWithUpdates,
+			})
+			return
+		}
 
 		// Active incidents
 		activeCursor, err := db.Collection("incidents").Find(ctx,
