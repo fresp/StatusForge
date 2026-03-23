@@ -1,10 +1,5 @@
-import { clsx, type ClassValue } from 'clsx'
 import type { ComponentStatus } from '../types'
 import type { Incident } from '../types'
-
-export function cn(...inputs: ClassValue[]) {
-  return clsx(inputs)
-}
 
 export const STATUS_LABELS: Record<ComponentStatus, string> = {
   operational: 'Operational',
