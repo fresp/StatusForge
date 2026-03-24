@@ -127,9 +127,6 @@ export function IncidentCarouselGroup({
               {incidents.length}
             </span>
           </div>
-          {subtitle && (
-            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
-          )}
         </div>
 
         <div className="flex items-center gap-2">

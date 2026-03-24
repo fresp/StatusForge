@@ -1,0 +1,77 @@
+:root {
+    --primary: #7c2d12;
+    --bg: #fff7ed;
+    --text: #431407;
+    --color-accent: #ea580c;
+    --font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --surface: rgba(255, 247, 237, 0.95);
+    --border: #fb923c;
+    --on-primary: #fff7ed;
+    --on-primary-subtle: #9a3412;
+    --text-muted: #9a3412;
+    --text-subtle: #c2410c;
+    --surface-incident: #fee2e2;
+    --border-incident: #ef4444;
+    --surface-maintenance: #ffedd5;
+    --border-maintenance: #fb923c;
+    --surface-uptime: #fff7ed;
+    --hero-image-border: #fed7aa;
+    --subcomponent-divider: #ffedd5;
+    --status-operational: #16a34a;
+    --status-degraded: #d97706;
+    --status-partial: #ea580c;
+    --status-major: #dc2626;
+    --status-maintenance: #f97316;
+    --status-resolved-bg: #dcfce7;
+    --status-resolved-text: #166534;
+    --bg-image-overlay: rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="dark"],
+.dark {
+    --primary: #fb923c;
+    --bg: #020617;
+    --text: #ffedd5;
+    --color-accent: #f97316;
+    --surface: rgba(2, 6, 23, 0.9);
+    --border: #ea580c;
+    --on-primary: #7c2d12;
+    --on-primary-subtle: #fdba74;
+    --text-muted: #fdba74;
+    --text-subtle: #fb923c;
+    --surface-incident: #450a0a;
+    --border-incident: #991b1b;
+    --surface-maintenance: #431407;
+    --border-maintenance: #9a3412;
+    --surface-uptime: #020617;
+    --hero-image-border: #7c2d12;
+    --subcomponent-divider: #431407;
+    --status-resolved-bg: #052e2b;
+    --status-resolved-text: #6ee7b7;
+    --bg-image-overlay: rgba(0, 0, 0, 0.75);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary: #fb923c;
+        --bg: #020617;
+        --text: #ffedd5;
+        --color-accent: #f97316;
+        --surface: rgba(2, 6, 23, 0.9);
+        --border: #ea580c;
+        --on-primary: #7c2d12;
+        --on-primary-subtle: #fdba74;
+        --text-muted: #fdba74;
+        --text-subtle: #fb923c;
+        --surface-incident: #450a0a;
+        --border-incident: #991b1b;
+        --surface-maintenance: #431407;
+        --border-maintenance: #9a3412;
+        --surface-uptime: #020617;
+        --hero-image-border: #7c2d12;
+        --subcomponent-divider: #431407;
+        --status-resolved-bg: #052e2b;
+        --status-resolved-text: #6ee7b7;
+        --bg-image-overlay: rgba(0, 0, 0, 0.75);
+    }
+}

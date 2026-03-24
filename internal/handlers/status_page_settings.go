@@ -20,9 +20,21 @@ var (
 		"default":  {},
 		"ocean":    {},
 		"graphite": {},
+		"ember": {},
+		"frost": {},
+
 	}
 	colorHexPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 )
+
+func isValidThemePreset(value string) bool {
+	if value == "" {
+		return true
+	}
+	// hanya allow safe string (prevent injection/path traversal)
+	matched, _ := regexp.MatchString(`^[a-z0-9-_]+$`, value)
+	return matched
+}
 
 func isValidColorHex(value string) bool {
 	return colorHexPattern.MatchString(value)
@@ -213,8 +225,9 @@ func UpdateStatusPageSettings(db *mongo.Database, hub *Hub) gin.HandlerFunc {
 		if req.Theme != nil {
 			if req.Theme.Preset != nil {
 				normalizedPreset := normalizeThemePreset(*req.Theme.Preset)
-				if _, ok := validThemePresets[normalizedPreset]; !ok {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "theme.preset must be one of: default, ocean, graphite"})
+
+				if !isValidThemePreset(normalizedPreset) {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid theme preset format"})
 					return
 				}
 				set["theme.preset"] = normalizedPreset
