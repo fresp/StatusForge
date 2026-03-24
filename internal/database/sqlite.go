@@ -2,8 +2,9 @@ package database
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
+	"net/url"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
@@ -13,7 +14,16 @@ func ConnectSQLite(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)", path)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+
+	u := &url.URL{Scheme: "file", Path: absPath}
+	query := u.Query()
+	query.Set("_pragma", "busy_timeout(5000)")
+	u.RawQuery = query.Encode()
+	dsn := u.String()
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

@@ -100,7 +100,7 @@ func BuildStatus(cfg *configs.Config) EngineStatus {
 		SQLiteConnected: GetSQLiteDB() != nil,
 	}
 
-	status.RuntimeSupported = engine == "mongodb"
+	status.RuntimeSupported = status.MongoConnected || status.SQLiteConnected
 	return status
 }
 
@@ -109,9 +109,14 @@ func ensureSQLiteParent(path string) error {
 	if cleanPath == "" {
 		return errors.New("sqlite path is required")
 	}
+
 	dir := filepath.Dir(cleanPath)
-	if dir == "." || dir == "" {
+	dir = strings.TrimSpace(dir)
+
+	// 🔥 HARDEN FIX
+	if dir == "." || dir == "./" || dir == "" {
 		return nil
 	}
+
 	return os.MkdirAll(dir, 0o755)
 }

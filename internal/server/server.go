@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -54,14 +55,7 @@ func RunServer() error {
 	if runtimeMongoReady {
 		RegisterAPIRoutes(r, hub, cfg, db)
 	} else {
-		r.NoRoute(StaticFileServer())
-		r.Any("/api/*path", func(c *gin.Context) {
-			if setupPending {
-				c.JSON(503, gin.H{"error": "setup required", "setupDone": false})
-				return
-			}
-			c.JSON(503, gin.H{"error": "selected database runtime is not yet available"})
-		})
+		r.NoRoute(setupFallbackHandler())
 	}
 
 	// Register health check endpoint
@@ -120,4 +114,28 @@ func RunServer() error {
 		return nil
 	}
 	return nil
+}
+
+func setupFallbackHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		if strings.HasPrefix(path, "/api/") {
+			liveCfg := configs.Load()
+			if !liveCfg.SetupDone {
+				c.JSON(503, gin.H{"error": "setup required", "setupDone": false})
+				return
+			}
+			status := database.BuildStatus(liveCfg)
+			c.JSON(503, gin.H{
+				"error":            "selected database runtime is not yet available",
+				"setupDone":        liveCfg.SetupDone,
+				"engine":           liveCfg.DBEngine,
+				"runtimeSupported": status.RuntimeSupported,
+			})
+			return
+		}
+
+		StaticFileServer()(c)
+	}
 }

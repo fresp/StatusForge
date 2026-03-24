@@ -16,6 +16,7 @@ import AdminProfile from './pages/admin/AdminProfile'
 import AdminSettings from './pages/admin/AdminSettings'
 import AdminWebhookChannels from './pages/admin/AdminWebhookChannels'
 import DatabaseSetup from './pages/admin/DatabaseSetup'
+import UnsupportedRuntime from './pages/admin/UnsupportedRuntime'
 import HistoryPage from './pages/HistoryPage'
 import { getStoredToken, getStoredProfile } from './lib/auth'
 import { getSetupStatus } from './lib/api'
@@ -76,6 +77,7 @@ export default function App() {
   const location = useLocation()
   const [setupChecked, setSetupChecked] = React.useState(false)
   const [setupDone, setSetupDone] = React.useState(true)
+  const [runtimeSupported, setRuntimeSupported] = React.useState(true)
 
   React.useEffect(() => {
     let cancelled = false
@@ -85,10 +87,12 @@ export default function App() {
         const status = await getSetupStatus()
         if (!cancelled) {
           setSetupDone(Boolean(status.setupDone))
+          setRuntimeSupported(Boolean(status.dbStatus.runtimeSupported))
         }
       } catch {
         if (!cancelled) {
           setSetupDone(true)
+          setRuntimeSupported(true)
         }
       } finally {
         if (!cancelled) {
@@ -112,6 +116,10 @@ export default function App() {
     return <Navigate to="/admin/setup" replace />
   }
 
+  if (setupDone && !runtimeSupported && location.pathname !== '/admin/unsupported-runtime') {
+    return <Navigate to="/admin/unsupported-runtime" replace />
+  }
+
   if (setupDone && location.pathname === '/admin/setup') {
     return <Navigate to="/admin/login" replace />
   }
@@ -124,6 +132,7 @@ export default function App() {
 
       {/* Admin auth */}
       <Route path="/admin/setup" element={<DatabaseSetup />} />
+      <Route path="/admin/unsupported-runtime" element={<UnsupportedRuntime />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/activate" element={<AdminActivate />} />
       {/* Admin protected routes */}

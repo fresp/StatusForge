@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getSetupStatus, saveSetupConfig, validateMongoSetup } from '../../lib/api'
 import type { DBEngine, SetupStatusResponse } from '../../types'
 
-const DEFAULT_SQLITE_PATH = './statusforge.db'
+const DEFAULT_SQLITE_PATH = './data/statusforge.db'
 
 export default function DatabaseSetup() {
   const navigate = useNavigate()

@@ -34,7 +34,7 @@ StatusForge is built with a modern, efficient, and scalable technology stack.
 
 - **Backend**: Go (GoLang 1.26+) with Gin HTTP web framework
 - **Frontend**: React 18 with Vite for a fast development experience and TypeScript for type safety
-- **Database**: MongoDB for full runtime support, with first-run database engine setup supporting MongoDB and SQLite configuration
+- **Database**: MongoDB and SQLite runtime support, with first-run database engine setup for either backend
 - **Caching & Pub/Sub**: Redis for high-performance caching and real-time updates
 - **Styling**: Tailwind CSS for utility-first styling
 
@@ -63,7 +63,7 @@ Ensure you have Docker and Docker Compose installed on your system.
     -   `DB_ENGINE`: Database engine selection (`mongodb` or `sqlite`).
     -   `MONGO_URI`: MongoDB connection string.
     -   `MONGO_DB_NAME`: Database name for MongoDB.
-    -   `SQLITE_PATH`: SQLite database file path when `DB_ENGINE=sqlite`.
+    -   `SQLITE_PATH`: SQLite database file path when `DB_ENGINE=sqlite` (default local path: `./data/statusforge.db`).
     -   `REDIS_ADDR`: Redis connection address.
     -   `JWT_SECRET`: Secret key for JWT authentication ( **change this in production!** ).
     -   `MFA_SECRET_KEY`: Secret key for MFA ( **change this in production!** ).
@@ -98,14 +98,14 @@ For developers who want to contribute or customize StatusForge, you can run the 
 
 -   Go 1.26+
 -   Node.js 20+
--   MongoDB instance (local or remote) for full runtime support, or SQLite for local setup/configuration
+-   MongoDB instance (local or remote) or SQLite for local and containerized runtime deployments
 -   Redis instance (local or remote)
 
 ### Backend
 
 1.  **Configure Environment Variables**: Copy `.env.example` to `.env` as described in the Docker Quick Start.
     - For MongoDB, set `DB_ENGINE=mongodb` plus `MONGO_URI` and `MONGO_DB_NAME`.
-    - For SQLite setup flow, set `DB_ENGINE=sqlite` and `SQLITE_PATH`, then complete the onboarding flow in the admin UI.
+    - For SQLite runtime, set `DB_ENGINE=sqlite` and `SQLITE_PATH` (the setup UI now defaults to `./data/statusforge.db`).
 2.  **Install Go dependencies**:
     ```bash
     go mod download
@@ -150,20 +150,24 @@ To build the frontend and backend for production:
 
 ### Docker Deployment
 
-The provided `Dockerfile` creates a minimal Alpine-based image embedding the built frontend assets into the Go binary. The `docker-compose.yml` orchestrates the `server`, `mongo`, and `redis` services.
+The provided `Dockerfile` creates a minimal Alpine-based image embedding the built frontend assets into the Go binary. It now prepares `/app/data` for SQLite-backed deployments, runs as a non-root user, and keeps `/app` writable for persisted setup configuration. The `docker-compose.yml` orchestrates the `server`, `mongo`, and `redis` services.
 
 ## 🗄️ Database Setup Flow
 
-StatusForge now includes a first-run database setup flow before the admin application is available.
+StatusForge includes a first-run database setup flow before the admin application is available.
 
 - On a fresh install, the app redirects to `/admin/setup` until database setup is completed.
 - The setup flow can validate MongoDB connectivity before persisting the selected engine.
-- SQLite can be configured as a local database target during setup.
+- SQLite can be configured as a local or container-backed runtime during setup.
+- After setup is saved, the frontend reads `dbStatus.runtimeSupported` from `/api/setup/status` to decide whether to continue into the admin experience or show a fallback screen.
 
-### Current limitation
+### Runtime behavior
 
-- MongoDB remains the only fully supported runtime backend for the complete monitoring and admin feature set.
-- SQLite setup and persistence are wired into the onboarding/configuration flow, but full SQLite runtime parity for business handlers and worker execution is not yet implemented.
+- MongoDB remains the recommended backend for larger or distributed deployments.
+- SQLite is now treated as a supported runtime when the configured database file can be opened successfully.
+- The SQLite connection layer normalizes the configured file path into a `file:` URL so paths containing spaces, `?`, or `#` characters work correctly.
+- API requests made before setup completion still return `503` with `setupDone=false`.
+- If setup is complete but the selected runtime is unavailable, the server returns a fallback `503` API response that includes the selected engine and `runtimeSupported` status so the React app can route users appropriately.
 
 For detailed Docker operations, refer to the `Makefile` for convenient commands like `make up`, `make up-build`, `make down`, `make down-v`, `make logs`, `make logs-server`, `make ps`, and `make shell-server`.
 

@@ -1,4 +1,6 @@
-# Multi-stage build for StatusForge unified server
+# =========================
+# Frontend Build
+# =========================
 FROM node:20-alpine AS frontend-build
 
 WORKDIR /app
@@ -10,13 +12,16 @@ COPY apps/web/ .
 RUN npm ci
 RUN npm run build
 
-# Build the Go backend
+
+# =========================
+# Backend Build
+# =========================
 FROM golang:1.26-alpine AS backend-build
 
 ARG TARGETARCH
 
 # Install build tools
-RUN apk add --no-cache ca-certificates git musl-dev gcc libcap-dev
+RUN apk add --no-cache ca-certificates git
 
 WORKDIR /app
 
@@ -30,23 +35,38 @@ COPY . .
 # Copy built frontend assets
 COPY --from=frontend-build /app/dist /app/internal/embed/dist
 
-# Build binary (auto-detect arch for M1/ARM64 support)
-RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -a -installsuffix cgo -o server cmd/server/main.go
+# Build binary
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -o server cmd/server/main.go
 
-# Final minimal image
+
+# =========================
+# Final Image
+# =========================
 FROM alpine:latest
 
-# Upgrade packages and install ca-certificates
+# Install runtime deps
 RUN apk upgrade --no-cache && \
-    apk --no-cache add ca-certificates
+    apk add --no-cache ca-certificates
 
+# ✅ Create non-root user FIRST
 RUN adduser -D -u 1001 appuser
 
+# Set working directory
 WORKDIR /app
 
+# ✅ Copy binary with correct ownership
 COPY --from=backend-build --chown=appuser:appuser /app/server /app/server
+
+# ✅ Prepare writable directory for SQLite
+RUN mkdir -p /app/data && chown appuser:appuser /app/data
+
+# Allow setup flow to persist .env in /app as non-root
+RUN chown appuser:appuser /app
+
+# Ensure binary executable
 RUN chmod +x /app/server
 
+# Switch to non-root user
 USER appuser
 
 # Expose port
@@ -56,4 +76,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://localhost:8080/health || exit 1
 
+# Start server
 ENTRYPOINT ["/app/server"]
