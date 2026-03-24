@@ -323,7 +323,7 @@ export default function AdminSettings() {
             <h3 className="text-sm font-semibold text-gray-900">Live Preview</h3>
             <div className="rounded-lg p-4" style={previewStyle}>
               <div
-                className="rounded-lg p-3 flex items-center justify-between"
+                className="rounded-lg p-3  items-center justify-between"
                 style={{
                   backgroundColor: 'var(--status-operational)',
                   color: 'var(--on-primary)',
@@ -337,23 +337,20 @@ export default function AdminSettings() {
                 <div className="flex items-center gap-2 text-xs">
                   <CheckCircle className="w-4 h-4" />
                   <span>All systems operational</span>
+                  <div className="flex items-center gap-3 text-xl">
+                    {settings.branding.heroImageUrl && (
+                      <img
+                        src={settings.branding.heroImageUrl}
+                        alt="hero"
+                        className="w-full h-24 object-cover rounded-md mt-3 border"
+                        style={{ borderColor: 'var(--hero-image-border)' }}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-              {settings.branding.heroImageUrl && (
-                <img
-                  src={settings.branding.heroImageUrl}
-                  alt="hero"
-                  className="w-full h-24 object-cover rounded-md mt-3 border"
-                  style={{ borderColor: 'var(--hero-image-border)' }}
-                />
-              )}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-3 text-xs">
-                <div className="rounded p-2 border" style={{ borderColor: 'var(--border)', color: 'var(--status-operational)', backgroundColor: 'var(--surface)' }}><CheckCircle className="w-4 h-4" /> Operational</div>
-                <div className="rounded p-2 border" style={{ borderColor: 'var(--border)', color: 'var(--status-degraded)', backgroundColor: 'var(--surface)' }}><AlertTriangle className="w-4 h-4" /> Degraded</div>
-                <div className="rounded p-2 border" style={{ borderColor: 'var(--border)', color: 'var(--status-partial)', backgroundColor: 'var(--surface)' }}><AlertCircle className="w-4 h-4" /> Partial</div>
-                <div className="rounded p-2 border" style={{ borderColor: 'var(--border)', color: 'var(--status-major)', backgroundColor: 'var(--surface)' }}><XCircle className="w-4 h-4" /> Major</div>
-                <div className="rounded p-2 border" style={{ borderColor: 'var(--border)', color: 'var(--status-maintenance)', backgroundColor: 'var(--surface)' }}><Wrench className="w-4 h-4" /> Maint.</div>
-              </div>
+
+
             </div>
           </div>
         </section>
