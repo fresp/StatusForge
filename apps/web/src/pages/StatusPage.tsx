@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle, AlertTriangle, AlertCircle, XCircle, Wrench, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle, AlertTriangle, AlertCircle, XCircle, Wrench } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { StatusSummary, ComponentWithSubs, Incident, Maintenance, StatusPageSettings } from '../types'
-import { STATUS_LABELS, getOverallStatusLabel, formatDate, formatDateShort, INCIDENT_STATUS_LABELS, INCIDENT_IMPACT_LABELS, groupIncidentsByRecentDays } from '../lib/utils'
-import { IncidentTimeline } from '../components/IncidentTimeline'
+import { STATUS_LABELS, getOverallStatusLabel, formatDate, formatDateShort, groupIncidentsByRecentDays, groupIncidentsByStatus } from '../lib/utils'
+import { IncidentCarouselGroup } from '../components/IncidentCarouselGroup'
 import { loadThemePresetStylesheet, getThemePresets, DEFAULT_THEME_PRESET } from '../lib/themePresetLoader'
 
 const DEFAULT_SETTINGS: StatusPageSettings = {
@@ -333,47 +333,35 @@ export default function StatusPage() {
 
       <div className={contentClassName}>
 
-        {/* Active Incidents Banner */}
-        {activeIncidents.map(incident => {
-          const isExpanded = expandedIncidents.has(incident.id)
-          return (
-            <div key={incident.id} className="border rounded-lg p-4" style={incidentSurfaceStyle}>
-              <div className="flex items-start gap-3">
-                <XCircle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--status-major)' }} />
-                <div className="flex-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-semibold">{incident.title}</h3>
-                      <p className="text-sm mt-1" style={{ color: mutedTextColor }}>{incident.description}</p>
-                      <div className="flex gap-4 mt-2 text-xs" style={{ color: subtleTextColor }}>
-                        <span>Status: {INCIDENT_STATUS_LABELS[incident.status]}</span>
-                        <span>Impact: {INCIDENT_IMPACT_LABELS[incident.impact]}</span>
-                        <span>Since: {formatDate(incident.createdAt)}</span>
-                        {incident.creatorUsername && <span>Created by: {incident.creatorUsername}</span>}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setExpandedIncidents(prev => {
-                        const next = new Set(prev)
-                        if (next.has(incident.id)) {
-                          next.delete(incident.id)
-                        } else {
-                          next.add(incident.id)
-                        }
-                        return next
-                      })}
-                      className="flex-shrink-0 transition-colors"
-                      style={{ color: 'var(--text-subtle)' }}
-                    >
-                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                    </button>
-                  </div>
-                  {isExpanded && <IncidentTimeline updates={incident.updates || []} />}
-                </div>
-              </div>
+        {activeIncidents.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <XCircle className="w-5 h-5" style={{ color: 'var(--status-major)' }} />
+              <h2 className="text-xl font-semibold" style={sectionTitleStyle}>Active Incidents</h2>
             </div>
-          )
-        })}
+
+            <div className="space-y-4">
+              {groupIncidentsByStatus(activeIncidents).map((group) => (
+                <IncidentCarouselGroup
+                  key={`active-${group.key}`}
+                  title={group.label}
+                  subtitle="Swipe or use arrows to browse active incidents without leaving the page context."
+                  incidents={group.incidents}
+                  expandedIncidents={expandedIncidents}
+                  onToggleExpand={(incidentId) => setExpandedIncidents((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(incidentId)) {
+                      next.delete(incidentId)
+                    } else {
+                      next.add(incidentId)
+                    }
+                    return next
+                  })}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Upcoming Maintenance */}
         {upcomingMaintenance.map(m => (
@@ -472,57 +460,24 @@ export default function StatusPage() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {group.incidents.map((incident) => {
-                          const isExpanded = expandedIncidents.has(incident.id)
-                          const isResolved = incident.status === 'resolved'
-
-                          return (
-                            <div key={incident.id} className="rounded-xl border p-5" style={cardSurfaceStyle}>
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <h3 className="font-medium" style={sectionTitleStyle}>{incident.title}</h3>
-                                  <p className="text-sm mt-1" style={{ color: mutedTextColor }}>{incident.description}</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span
-                                    className="text-xs px-2 py-1 rounded-full font-medium"
-                                    style={
-                                      isResolved
-                                        ? { backgroundColor: 'var(--status-resolved-bg)', color: 'var(--status-resolved-text)' }
-                                        : { backgroundColor: 'var(--status-active-bg)', color: 'var(--status-active-text)' }
-                                    }
-                                  >
-                                    {INCIDENT_STATUS_LABELS[incident.status]}
-                                  </span>
-                                  <button
-                                    onClick={() => setExpandedIncidents((prev) => {
-                                      const next = new Set(prev)
-                                      if (next.has(incident.id)) {
-                                        next.delete(incident.id)
-                                      } else {
-                                        next.add(incident.id)
-                                      }
-                                      return next
-                                    })}
-                                    className="flex-shrink-0 transition-colors"
-                                    style={{ color: 'var(--text-subtle)' }}
-                                  >
-                                    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap gap-4 mt-3 text-xs" style={{ color: subtleTextColor }}>
-                                <span>Impact: {INCIDENT_IMPACT_LABELS[incident.impact]}</span>
-                                <span>Created: {formatDate(incident.createdAt)}</span>
-                                {incident.creatorUsername && <span>Created by: {incident.creatorUsername}</span>}
-                                {incident.resolvedAt && <span>Resolved: {formatDate(incident.resolvedAt)}</span>}
-                              </div>
-
-                              {isExpanded && <IncidentTimeline updates={incident.updates || []} />}
-                            </div>
-                          )
-                        })}
+                        {groupIncidentsByStatus(group.incidents).map((statusGroup) => (
+                          <IncidentCarouselGroup
+                            key={`${group.dateKey}-${statusGroup.key}`}
+                            title={statusGroup.label}
+                            subtitle={dayLabel}
+                            incidents={statusGroup.incidents}
+                            expandedIncidents={expandedIncidents}
+                            onToggleExpand={(incidentId) => setExpandedIncidents((prev) => {
+                              const next = new Set(prev)
+                              if (next.has(incidentId)) {
+                                next.delete(incidentId)
+                              } else {
+                                next.add(incidentId)
+                              }
+                              return next
+                            })}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>

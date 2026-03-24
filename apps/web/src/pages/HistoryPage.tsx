@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
-import { IncidentTimeline } from '../components/IncidentTimeline'
+import { IncidentCarouselGroup } from '../components/IncidentCarouselGroup'
 import type { Incident, StatusPageSettings } from '../types'
 import {
   formatDate,
-  INCIDENT_IMPACT_LABELS,
-  INCIDENT_STATUS_LABELS,
+  groupIncidentsByStatus,
 } from '../lib/utils'
 import { loadThemePresetStylesheet, getThemePresets, DEFAULT_THEME_PRESET } from '../lib/themePresetLoader'
 
@@ -267,70 +266,26 @@ export default function HistoryPage() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {monthGroup.incidents.map((incident) => {
-                      const isExpanded = expandedIncidents.has(incident.id)
-                      const isResolved = incident.status === 'resolved'
-
-                      return (
-                        <div
-                          key={incident.id}
-                          className="rounded-lg border p-4"
-                          style={{
-                            borderColor: 'var(--border-incident)',
-                            backgroundColor: 'var(--surface-incident)',
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h5 className="font-medium">{incident.title}</h5>
-                              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                                {incident.description}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <span
-                                className="text-xs px-2 py-1 rounded-full font-medium"
-                                style={
-                                  isResolved
-                                    ? { backgroundColor: 'var(--status-resolved-bg)', color: 'var(--status-resolved-text)' }
-                                    : { backgroundColor: 'var(--status-active-bg)', color: 'var(--status-active-text)' }
-                                }
-                              >
-                                {INCIDENT_STATUS_LABELS[incident.status]}
-                              </span>
-
-                              <button
-                                onClick={() => {
-                                  setExpandedIncidents((prev) => {
-                                    const next = new Set(prev)
-                                    if (next.has(incident.id)) {
-                                      next.delete(incident.id)
-                                    } else {
-                                      next.add(incident.id)
-                                    }
-                                    return next
-                                  })
-                                }}
-                                className="flex-shrink-0 transition-colors"
-                                style={{ color: 'var(--text-subtle)' }}
-                              >
-                                {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-4 mt-3 text-xs" style={{ color: 'var(--text-subtle)' }}>
-                            <span>Impact: {INCIDENT_IMPACT_LABELS[incident.impact]}</span>
-                            <span>Created: {formatDate(incident.createdAt)}</span>
-                            {incident.resolvedAt && <span>Resolved: {formatDate(incident.resolvedAt)}</span>}
-                            {incident.creatorUsername && <span>Created by: {incident.creatorUsername}</span>}
-                          </div>
-
-                          {isExpanded && <IncidentTimeline updates={incident.updates || []} />}
-                        </div>
-                      )
-                    })}
+                    {groupIncidentsByStatus(monthGroup.incidents).map((statusGroup) => (
+                      <IncidentCarouselGroup
+                        key={`${selectedQuarter.year}-${monthGroup.monthIndex}-${statusGroup.key}`}
+                        title={statusGroup.label}
+                        subtitle={`${monthGroup.monthLabel} · ${formatDate(monthGroup.incidents[0].createdAt).split(',')[2]?.trim() || selectedQuarter.year}`}
+                        incidents={statusGroup.incidents}
+                        expandedIncidents={expandedIncidents}
+                        onToggleExpand={(incidentId) => {
+                          setExpandedIncidents((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(incidentId)) {
+                              next.delete(incidentId)
+                            } else {
+                              next.add(incidentId)
+                            }
+                            return next
+                          })
+                        }}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
