@@ -12,7 +12,7 @@ import (
 )
 
 // SetupShutdownSignalHandler sets up a signal handler for graceful shutdown
-func SetupShutdownSignalHandler(cancel context.CancelFunc) {
+func SetupShutdownSignalHandler(cancel context.CancelFunc, timeout time.Duration) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -21,13 +21,17 @@ func SetupShutdownSignalHandler(cancel context.CancelFunc) {
 		log.Printf("[SHUTDOWN] Received signal: %s", sig.String())
 		log.Printf("[SHUTDOWN] Initiating graceful shutdown...")
 
-		cancel() // Cancel the main context
+		// Trigger cancellation (worker, etc)
+		cancel()
 
-		// Wait for 30 seconds to allow goroutines to finish
-		gracefulTimer := time.NewTimer(30 * time.Second)
-		<-gracefulTimer.C
+		// Force exit after timeout (safety net)
+		if timeout > 0 {
+			timer := time.NewTimer(timeout)
+			defer timer.Stop()
 
-		log.Printf("[SHUTDOWN] Force exit after timeout")
-		os.Exit(1)
+			<-timer.C
+			log.Printf("[SHUTDOWN] Force exit after %s timeout", timeout)
+			os.Exit(1)
+		}
 	}()
 }

@@ -68,7 +68,7 @@ export interface Incident {
   impact: IncidentImpact
   creatorId?: string
   creatorUsername?: string
-  affectedComponents: string[]
+  affectedComponents: Component[]
   createdAt: string
   updatedAt: string
   resolvedAt?: string

@@ -58,6 +58,8 @@ export function IncidentCarouselGroup({
 
   const currentIncident = incidents[currentIndex]
   const currentPositionLabel = `${Math.min(currentIndex + 1, Math.max(incidents.length, 1))} / ${Math.max(incidents.length, 1)}`
+  const componentNames =
+    currentIncident.affectedComponents?.map(c => c.name).join(', ') || ''
 
   const severityStyle = useMemo(() => {
     if (!currentIncident) {
@@ -200,6 +202,11 @@ export function IncidentCarouselGroup({
                 <h4 className="text-lg font-semibold leading-tight" style={{ color: 'var(--text)' }}>
                   {currentIncident.title}
                 </h4>
+                {componentNames && (
+                  <span className="text-xs font-medium uppercase tracking-[0.18em]" style={{ color: 'var(--text-subtle)' }}>
+                    {componentNames}
+                  </span>
+                )}
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <div>

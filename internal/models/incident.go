@@ -8,7 +8,8 @@ import (
 
 type IncidentWithUpdates struct {
 	Incident
-	Updates []IncidentUpdate `json:"updates"`
+	Updates 		   []IncidentUpdate `json:"updates"`
+	AffectedComponents []Component `json:"affectedComponents"`
 }
 
 type IncidentStatus string

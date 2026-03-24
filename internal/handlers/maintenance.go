@@ -38,6 +38,36 @@ func GetMaintenance(db *mongo.Database) gin.HandlerFunc {
 	}
 }
 
+func GetPublicMaintenance(db *mongo.Database) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		cursor, err := db.Collection("maintenance").Find(
+			ctx,
+			bson.M{
+				"status": bson.M{"$ne": "completed"},
+			},
+			options.Find().SetSort(bson.D{{Key: "startTime", Value: -1}}),
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		defer cursor.Close(ctx)
+
+		var items []models.Maintenance
+		if err := cursor.All(ctx, &items); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if items == nil {
+			items = []models.Maintenance{}
+		}
+		c.JSON(http.StatusOK, items)
+	}
+}
+
 func CreateMaintenance(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {

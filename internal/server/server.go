@@ -28,8 +28,19 @@ func RunServer() error {
 		log.Printf("[SERVER] Redis connection warning: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Context setup (conditional graceful)
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	if cfg.GracefulShutdown {
+		ctx, cancel = context.WithCancel(context.Background())
+		defer cancel()
+
+		// Only setup signal handler if graceful enabled
+		SetupShutdownSignalHandler(cancel, time.Duration(cfg.GracefulTimeout)*time.Second)
+	} else {
+		ctx = context.Background()
+	}
 
 	db := database.GetDB()
 	rdb := database.GetRedis()
@@ -62,31 +73,32 @@ func RunServer() error {
 	// Seed admin user
 	SeedAdmin(db, cfg)
 
-
 	// Serve React root
 	r.NoRoute(StaticFileServer())
 
-	// Setup shutdown signal handler - this will call cancel() when SIGTERM/SIGINT is received
-	SetupShutdownSignalHandler(cancel)
-
 	log.Printf("[SERVER] Server starting on port %s", cfg.Port)
+
+	// Run server (blocking)
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("[SERVER] Failed to run server: %v", err)
 	}
 
-	// Wait for shutdown signal
-	<-ctx.Done()
+	// ONLY run graceful shutdown logic if enabled
+	if cfg.GracefulShutdown {
+		// Wait for shutdown signal
+		<-ctx.Done()
 
-	// Gracefully stop worker if it was started
-	if cfg.EnableWorker {
-		log.Println("[SERVER] Stopping worker...")
-		if err := StopWorker(); err != nil {
-			log.Printf("[SERVER] Error stopping worker: %v", err)
+		// Gracefully stop worker
+		if cfg.EnableWorker {
+			log.Println("[SERVER] Stopping worker...")
+			if err := StopWorker(); err != nil {
+				log.Printf("[SERVER] Error stopping worker: %v", err)
+			}
+			time.Sleep(1 * time.Second)
 		}
-		// Wait for all worker goroutines to finish
-		time.Sleep(1 * time.Second)
+
+		log.Println("[SERVER] Server shutdown complete")
 	}
 
-	log.Println("[SERVER] Server shutdown complete")
 	return nil
 }

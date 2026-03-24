@@ -164,11 +164,11 @@ function StatusIcon({ status }: { status: string }) {
   const cls = 'w-5 h-5'
   const color = `var(${getStatusToken(status)})`
   switch (status) {
-    case 'operational': return <CheckCircle className={cls} style={{ color }} />
-    case 'degraded_performance': return <AlertTriangle className={cls} style={{ color }} />
-    case 'partial_outage': return <AlertCircle className={cls} style={{ color }} />
+    case 'operational': return <CheckCircle className={cls} />
+    case 'degraded_performance': return <AlertTriangle className={cls} />
+    case 'partial_outage': return <AlertCircle className={cls} />
     case 'major_outage': return <XCircle className={cls} />
-    case 'maintenance': return <Wrench className={cls} style={{ color }} />
+    case 'maintenance': return <Wrench className={cls} />
     default: return <CheckCircle className={cls} style={{ color: 'var(--status-operational)' }} />
   }
 }
@@ -198,7 +198,7 @@ export default function StatusPage() {
   const { data: incidentData, refetch: refetchIncidents } = useApi<{ active: Incident[]; resolved: Incident[] }>('/status/incidents')
   const { data: settingsData, refetch: refetchSettings } = useApi<StatusPageSettings>('/status/settings')
 
-  const { data: maintenanceData } = useApi<Maintenance[]>('/maintenance')
+  const { data: maintenanceData } = useApi<Maintenance[]>('/status/maintenance')
 
   const handleWsMessage = useCallback((event: { type: string }) => {
     if (['component_updated', 'component_created'].includes(event.type)) {

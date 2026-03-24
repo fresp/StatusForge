@@ -41,6 +41,7 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 	api.GET("/status/category/:prefix", handlers.GetStatusCategory(database.GetDB()))
 	api.GET("/v1/status/category/:prefix", handlers.GetStatusCategory(database.GetDB()))
 	api.GET("/status/settings", handlers.GetPublicStatusPageSettings(database.GetDB()))
+	api.GET("/status/maintenance", handlers.GetPublicMaintenance(database.GetDB()))
 	api.POST("/subscribe", handlers.Subscribe(database.GetDB()))
 
 	api.POST("/auth/login", handlers.Login(database.GetDB(), cfg.JWTSecret))

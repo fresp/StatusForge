@@ -339,6 +339,11 @@ func GetStatusIncidents(db *mongo.Database) gin.HandlerFunc {
 			startDate = &defaultStartDate
 		}
 
+		var incidents []models.Incident
+
+		// =========================
+		// FETCH INCIDENTS (UNIFIED)
+		// =========================
 		if startDate != nil || endDate != nil {
 			dateFilter := bson.M{}
 			if startDate != nil {
@@ -348,130 +353,128 @@ func GetStatusIncidents(db *mongo.Database) gin.HandlerFunc {
 				dateFilter["$lt"] = *endDate
 			}
 
-			cursor, findErr := db.Collection("incidents").Find(ctx,
+			cursor, err := db.Collection("incidents").Find(ctx,
 				bson.M{"createdAt": dateFilter},
 				options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
 			)
-			if findErr != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": findErr.Error()})
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
+			defer cursor.Close(ctx)
 
-			var incidents []models.Incident
 			cursor.All(ctx, &incidents)
-			cursor.Close(ctx)
 
-			if incidents == nil {
-				incidents = []models.Incident{}
-			}
-
-			allIDs := make([]primitive.ObjectID, 0, len(incidents))
-			for _, inc := range incidents {
-				allIDs = append(allIDs, inc.ID)
-			}
-
-			updatesMap, updateErr := fetchIncidentUpdates(ctx, db, allIDs)
-			if updateErr != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": updateErr.Error()})
+		} else {
+			// Active incidents
+			activeCursor, err := db.Collection("incidents").Find(ctx,
+				bson.M{"status": bson.M{"$ne": models.IncidentResolved}},
+				options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
+			defer activeCursor.Close(ctx)
 
-			activeWithUpdates := make([]models.IncidentWithUpdates, 0, len(incidents))
-			resolvedWithUpdates := make([]models.IncidentWithUpdates, 0, len(incidents))
-			for _, inc := range incidents {
-				incidentWithUpdates := models.IncidentWithUpdates{
-					Incident: inc,
-					Updates:  updatesMap[inc.ID],
-				}
+			var activeIncidents []models.Incident
+			activeCursor.All(ctx, &activeIncidents)
 
-				if inc.Status == models.IncidentResolved {
-					resolvedWithUpdates = append(resolvedWithUpdates, incidentWithUpdates)
-				} else {
-					activeWithUpdates = append(activeWithUpdates, incidentWithUpdates)
-				}
+			// Resolved (last 30 days)
+			since30 := time.Now().AddDate(0, 0, -30)
+			resolvedCursor, _ := db.Collection("incidents").Find(ctx,
+				bson.M{
+					"status":     models.IncidentResolved,
+					"resolvedAt": bson.M{"$gte": since30},
+				},
+				options.Find().SetSort(bson.D{{Key: "resolvedAt", Value: -1}}),
+			)
+
+			var resolvedIncidents []models.Incident
+			if resolvedCursor != nil {
+				defer resolvedCursor.Close(ctx)
+				resolvedCursor.All(ctx, &resolvedIncidents)
 			}
 
-			if activeWithUpdates == nil {
-				activeWithUpdates = []models.IncidentWithUpdates{}
-			}
-			if resolvedWithUpdates == nil {
-				resolvedWithUpdates = []models.IncidentWithUpdates{}
-			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"active":   activeWithUpdates,
-				"resolved": resolvedWithUpdates,
-			})
-			return
+			incidents = append(activeIncidents, resolvedIncidents...)
 		}
 
-		// Active incidents
-		activeCursor, err := db.Collection("incidents").Find(ctx,
-			bson.M{"status": bson.M{"$ne": models.IncidentResolved}},
-			options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		var activeIncidents []models.Incident
-		activeCursor.All(ctx, &activeIncidents)
-		activeCursor.Close(ctx)
-
-		// Past 30 days resolved
-		since30 := time.Now().AddDate(0, 0, -30)
-		resolvedCursor, _ := db.Collection("incidents").Find(ctx,
-			bson.M{"status": models.IncidentResolved, "resolvedAt": bson.M{"$gte": since30}},
-			options.Find().SetSort(bson.D{{Key: "resolvedAt", Value: -1}}))
-		var resolvedIncidents []models.Incident
-		if resolvedCursor != nil {
-			resolvedCursor.All(ctx, &resolvedIncidents)
-			resolvedCursor.Close(ctx)
-		}
-		if activeIncidents == nil {
-			activeIncidents = []models.Incident{}
-		}
-		if resolvedIncidents == nil {
-			resolvedIncidents = []models.Incident{}
+		if incidents == nil {
+			incidents = []models.Incident{}
 		}
 
-		// Collect all incident IDs for batch update fetch
-		allIDs := make([]primitive.ObjectID, 0, len(activeIncidents)+len(resolvedIncidents))
-		for _, inc := range activeIncidents {
-			allIDs = append(allIDs, inc.ID)
-		}
-		for _, inc := range resolvedIncidents {
+		// =========================
+		// FETCH UPDATES (BATCH)
+		// =========================
+		allIDs := make([]primitive.ObjectID, 0, len(incidents))
+		for _, inc := range incidents {
 			allIDs = append(allIDs, inc.ID)
 		}
 
-		// Fetch all updates in a single batch query
 		updatesMap, err := fetchIncidentUpdates(ctx, db, allIDs)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Attach updates to each incident
-		var activeWithUpdates []models.IncidentWithUpdates
-		for _, inc := range activeIncidents {
-			activeWithUpdates = append(activeWithUpdates, models.IncidentWithUpdates{
-				Incident: inc,
-				Updates:  updatesMap[inc.ID],
-			})
+		// =========================
+		// 🔥 FETCH COMPONENTS (NEW)
+		// =========================
+		componentIDSet := make(map[primitive.ObjectID]struct{})
+		for _, inc := range incidents {
+			for _, compID := range inc.AffectedComponents {
+				componentIDSet[compID] = struct{}{}
+			}
 		}
 
-		var resolvedWithUpdates []models.IncidentWithUpdates
-		for _, inc := range resolvedIncidents {
-			resolvedWithUpdates = append(resolvedWithUpdates, models.IncidentWithUpdates{
-				Incident: inc,
-				Updates:  updatesMap[inc.ID],
-			})
+		componentIDs := make([]primitive.ObjectID, 0, len(componentIDSet))
+		for id := range componentIDSet {
+			componentIDs = append(componentIDs, id)
 		}
 
-		if activeWithUpdates == nil {
-			activeWithUpdates = []models.IncidentWithUpdates{}
+		componentMap := make(map[primitive.ObjectID]models.Component)
+
+		if len(componentIDs) > 0 {
+			cursor, err := db.Collection("components").Find(ctx, bson.M{
+				"_id": bson.M{"$in": componentIDs},
+			})
+			if err == nil {
+				defer cursor.Close(ctx)
+
+				var components []models.Component
+				cursor.All(ctx, &components)
+
+				for _, comp := range components {
+					componentMap[comp.ID] = comp
+				}
+			}
 		}
-		if resolvedWithUpdates == nil {
-			resolvedWithUpdates = []models.IncidentWithUpdates{}
+
+		// =========================
+		// BUILD RESPONSE
+		// =========================
+		activeWithUpdates := []models.IncidentWithUpdates{}
+		resolvedWithUpdates := []models.IncidentWithUpdates{}
+
+		for _, inc := range incidents {
+			// 🔥 expand components
+			expandedComponents := []models.Component{}
+			for _, compID := range inc.AffectedComponents {
+				if comp, ok := componentMap[compID]; ok {
+					expandedComponents = append(expandedComponents, comp)
+				}
+			}
+
+			item := models.IncidentWithUpdates{
+				Incident:           inc,
+				Updates:            updatesMap[inc.ID],
+				AffectedComponents: expandedComponents,
+			}
+
+			if inc.Status == models.IncidentResolved {
+				resolvedWithUpdates = append(resolvedWithUpdates, item)
+			} else {
+				activeWithUpdates = append(activeWithUpdates, item)
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{
