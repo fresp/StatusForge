@@ -402,7 +402,7 @@ export default function StatusPage() {
           </div>
         )}
 
-        <div className="py-10 border-t" style={{ borderColor: 'var(--border)' }}>
+        <div className="py-2 border-t" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center justify-between">
 
             {/* LEFT BLOCK */}
