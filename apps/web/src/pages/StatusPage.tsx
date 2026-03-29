@@ -17,6 +17,7 @@ import {
   readCachedStatusPageSettings,
 } from '../lib/statusPageSettings'
 import Footer from '../components/layout/Footer'
+import { UptimeTimeline } from '../components/status/UptimeTimeline'
 
 function getStatusToken(status: string): string {
   switch (status) {
@@ -56,24 +57,6 @@ function StatusIcon({ status }: { status: string }) {
     case 'maintenance': return <Wrench className={cls} />
     default: return <CheckCircle className={cls} style={{ color: 'var(--status-operational)' }} />
   }
-}
-
-function UptimeBar({ bars }: { bars: { date: string; uptimePercent: number; status: string }[] }) {
-  return (
-    <div className="flex gap-px items-end h-8 mt-2">
-      {bars.map((bar, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
-          style={{
-            backgroundColor: `var(${getStatusToken(bar.status)})`,
-            height: `${Math.max(20, bar.uptimePercent / 100 * 32)}px`,
-          }}
-          title={`${bar.date}: ${bar.uptimePercent.toFixed(2)}% uptime`}
-        />
-      ))}
-    </div>
-  )
 }
 
 export default function StatusPage() {
@@ -335,19 +318,13 @@ export default function StatusPage() {
               {/* 90-day uptime */}
               {comp.uptimeHistory && comp.uptimeHistory.length > 0 && (
                 <div className="px-6 py-4 border-t" style={uptimeSurfaceStyle}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs" style={{ color: subtleTextColor }}>90-day uptime</span>
-                    <span className="text-xs" style={{ color: subtleTextColor }}>
-                      {comp.uptimeHistory.length > 0
-                        ? `${(comp.uptimeHistory.reduce((s, b) => s + b.uptimePercent, 0) / comp.uptimeHistory.length).toFixed(2)}% avg`
-                        : ''}
-                    </span>
-                  </div>
-                  <UptimeBar bars={comp.uptimeHistory} />
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs" style={{ color: subtleTextColor }}>{formatDateShort(comp.uptimeHistory[0]?.date)}</span>
-                    <span className="text-xs" style={{ color: subtleTextColor }}>Today</span>
-                  </div>
+                  <UptimeTimeline
+                    history={comp.uptimeHistory}
+                    showAverage
+                    average={comp.uptimeHistory.length > 0
+                      ? comp.uptimeHistory.reduce((s, b) => s + b.uptimePercent, 0) / comp.uptimeHistory.length
+                      : undefined}
+                  />
                 </div>
               )}
             </div>

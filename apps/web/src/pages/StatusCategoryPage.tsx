@@ -7,6 +7,7 @@ import type { CategoryServiceStatus, ComponentStatus, Incident, IncidentUpdate, 
 import { INCIDENT_STATUS_LABELS } from '../lib/utils'
 import Footer from '../components/layout/Footer'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { UptimeTimeline } from '../components/status/UptimeTimeline'
 
 const EMPTY_INCIDENTS: Incident[] = []
 const EMPTY_SERVICES: CategoryServiceStatus[] = []
@@ -220,20 +221,15 @@ function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; i
       </div>
 
       {hasMonitoringData ? (
-        <div className="mt-3 grid gap-1">
-          <div className="h-2 rounded-full bg-[var(--surface-elevated)] overflow-hidden">
-            <div
-              className="h-full"
-              style={{
-                width: `${Math.max(0, Math.min(100, service.uptime90d))}%`,
-                backgroundColor: `var(${getStatusToken(service.status)})`,
-              }}
-            />
-          </div>
-          <p className="text-xs text-[var(--text-subtle)]">Based on {service.uptimeHistory.length} monitored day entries</p>
+        <div className="py-4 border-t">
+          <UptimeTimeline
+            history={service.uptimeHistory}
+            showAverage
+            average={service.uptime90d}
+          />
         </div>
       ) : (
-        <p className="text-xs text-[var(--text-subtle)] mt-3">Monitoring data is not available for this service yet.</p>
+        <p className="text-xs text-[var(--text-subtle)] mt-4">Monitoring data is not available for this service yet.</p>
       )}
 
       {activeIncidents.length > 0 && (
