@@ -126,7 +126,7 @@ function incidentAffectsService(incident: Incident, service: CategoryServiceStat
 
 function PlatformStatus({ data, aggregateStatus }: { data: NonNullable<ReturnType<typeof useCategorySummary>['data']>; aggregateStatus: ComponentStatus }) {
   return (
-    <header className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+    <header className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">{data.name}</h1>
@@ -157,7 +157,7 @@ function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; i
     : (hasMonitoringData ? 'No known issues' : 'Monitoring unavailable')
 
   return (
-    <article className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
+    <article className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h3 className="text-base font-semibold">{service.name}</h3>
@@ -189,7 +189,7 @@ function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; i
       )}
 
       {activeIncidents.length > 0 && (
-        <div className="mt-4">
+        <div className="rounded-md border p-5" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
           <IncidentCarouselGroup
             title="Active incidents"
             incidents={activeIncidents}
@@ -261,7 +261,7 @@ export default function StatusCategoryPage() {
               <ChevronRight className="w-4 h-4" />
               <span>{categoryPrefix ?? 'Unknown category'}</span>
             </nav>
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+            <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-6">
               <h1 className="text-xl font-semibold mb-2">Category unavailable</h1>
               <p className="text-sm text-[var(--text-muted)]">{error ?? 'Unable to load this category right now.'}</p>
             </div>
@@ -295,7 +295,7 @@ export default function StatusCategoryPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-muted)]">
+            <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-muted)]">
               No services are configured for this category yet.
             </div>
           )}

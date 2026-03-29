@@ -210,7 +210,7 @@ export default function StatusPage() {
               <img
                 src={settings.branding.heroImageUrl}
                 alt="Status page hero"
-                className="w-full max-h-48 object-cover rounded-xl border mb-4"
+                className="w-full max-h-48 object-cover rounded-md border mb-4"
                 style={heroImageStyle}
               />
             )}
@@ -244,28 +244,25 @@ export default function StatusPage() {
           ))}
 
           {activeIncidents.length > 0 && (
-            <section className="space-y-4">
-
-              <div className="space-y-4">
-                {groupIncidentsByStatus(activeIncidents).map((group) => (
-                  <IncidentCarouselGroup
-                    key={`active-${group.key}`}
-                    title={group.label}
-                    subtitle="Swipe or use arrows to browse active incidents without leaving the page context."
-                    incidents={group.incidents}
-                    expandedIncidents={expandedIncidents}
-                    onToggleExpand={(incidentId) => setExpandedIncidents((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(incidentId)) {
-                        next.delete(incidentId)
-                      } else {
-                        next.add(incidentId)
-                      }
-                      return next
-                    })}
-                  />
-                ))}
-              </div>
+            <section className="rounded-md border p-5" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+              {groupIncidentsByStatus(activeIncidents).map((group) => (
+                <IncidentCarouselGroup
+                  key={`active-${group.key}`}
+                  title={group.label}
+                  subtitle="Swipe or use arrows to browse active incidents without leaving the page context."
+                  incidents={group.incidents}
+                  expandedIncidents={expandedIncidents}
+                  onToggleExpand={(incidentId) => setExpandedIncidents((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(incidentId)) {
+                      next.delete(incidentId)
+                    } else {
+                      next.add(incidentId)
+                    }
+                    return next
+                  })}
+                />
+              ))}
             </section>
           )}
 
@@ -273,7 +270,7 @@ export default function StatusPage() {
           {(components || []).map(comp => (
             <div
               key={comp.id}
-              className="rounded-xl shadow-sm border overflow-hidden cursor-pointer transition-colors hover:bg-[var(--surface-uptime)]"
+              className="rounded-md shadow-sm border overflow-hidden cursor-pointer transition-colors hover:bg-[var(--surface-uptime)]"
               style={cardSurfaceStyle}
               role="button"
               tabIndex={0}

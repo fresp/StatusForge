@@ -182,7 +182,7 @@ export default function HistoryPage() {
 
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
           <div
-            className="rounded-xl border p-4 flex items-center justify-between"
+            className="rounded-md border p-4 flex items-center justify-between"
             style={{
               borderColor: 'var(--border)',
               backgroundColor: 'var(--surface)',
@@ -224,7 +224,7 @@ export default function HistoryPage() {
 
           {incidentsLoading ? (
             <div
-              className="rounded-xl border p-6"
+              className="rounded-md border p-6"
               style={{
                 borderColor: 'var(--border)',
                 backgroundColor: 'var(--surface)',
@@ -234,7 +234,7 @@ export default function HistoryPage() {
             </div>
           ) : incidentsError ? (
             <div
-              className="rounded-xl border p-6"
+              className="rounded-md border p-6"
               style={{
                 borderColor: 'var(--border)',
                 backgroundColor: 'var(--surface)',
@@ -249,7 +249,7 @@ export default function HistoryPage() {
               {monthBuckets.map((monthGroup) => (
                 <div
                   key={`${selectedQuarter.year}-${monthGroup.monthIndex}`}
-                  className="rounded-xl border p-5"
+                  className="rounded-md border p-5"
                   style={{
                     borderColor: 'var(--border)',
                     backgroundColor: 'var(--surface)',
