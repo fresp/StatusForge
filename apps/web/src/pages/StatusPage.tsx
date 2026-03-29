@@ -241,6 +241,23 @@ export default function StatusPage() {
       </div>
 
       <div className={contentClassName}>
+        {/* Upcoming Maintenance */}
+        {upcomingMaintenance.map(m => (
+          <div key={m.id} className="border rounded-lg p-4" style={maintenanceSurfaceStyle}>
+            <div className="flex items-start gap-3">
+              <Wrench className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--status-maintenance)' }} />
+              <div>
+                <h3 className="font-semibold">{m.title}</h3>
+                <p className="text-sm mt-1" style={{ color: mutedTextColor }}>{m.description}</p>
+                <div className="flex gap-4 mt-2 text-xs" style={{ color: subtleTextColor }}>
+                  <span>Status: {m.status.replace('_', ' ')}</span>
+                  <span>{formatDate(m.startTime)} → {formatDate(m.endTime)}</span>
+                  {m.creatorUsername && <span>Created by: {m.creatorUsername}</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
 
         {activeIncidents.length > 0 && (
           <section className="space-y-4">
@@ -267,24 +284,6 @@ export default function StatusPage() {
             </div>
           </section>
         )}
-
-        {/* Upcoming Maintenance */}
-        {upcomingMaintenance.map(m => (
-          <div key={m.id} className="border rounded-lg p-4" style={maintenanceSurfaceStyle}>
-            <div className="flex items-start gap-3">
-              <Wrench className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--status-maintenance)' }} />
-              <div>
-                <h3 className="font-semibold">{m.title}</h3>
-                <p className="text-sm mt-1" style={{ color: mutedTextColor }}>{m.description}</p>
-                <div className="flex gap-4 mt-2 text-xs" style={{ color: subtleTextColor }}>
-                  <span>Status: {m.status.replace('_', ' ')}</span>
-                  <span>{formatDate(m.startTime)} → {formatDate(m.endTime)}</span>
-                  {m.creatorUsername && <span>Created by: {m.creatorUsername}</span>}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
 
         {/* Components */}
         {(components || []).map(comp => (

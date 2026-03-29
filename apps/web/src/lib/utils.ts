@@ -175,13 +175,33 @@ export function groupIncidentsByStatus(
     )
   })
 
-  return [
-    {
+  const activeIncidents = sortedIncidents.filter(
+    (i) => i.status !== 'resolved'
+  )
+
+  const resolvedIncidents = sortedIncidents.filter(
+    (i) => i.status === 'resolved'
+  )
+
+  const groups: IncidentStatusGroup[] = []
+
+  if (activeIncidents.length > 0) {
+    groups.push({
       key: 'active',
       label: 'Active Incidents',
-      incidents: sortedIncidents,
-    },
-  ]
+      incidents: activeIncidents,
+    })
+  }
+
+  if (resolvedIncidents.length > 0) {
+    groups.push({
+      key: 'resolved',
+      label: 'Resolved Incidents',
+      incidents: resolvedIncidents,
+    })
+  }
+
+  return groups
 }
 
 export function groupIncidentsByDate(incidents: Incident[]): IncidentDateGroup[] {
