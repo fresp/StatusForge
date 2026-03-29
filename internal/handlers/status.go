@@ -524,26 +524,33 @@ func GetStatusComponents(db *mongo.Database) gin.HandlerFunc {
 	}
 }
 
-func build90DayBars(compID primitive.ObjectID, monitorsByComp map[primitive.ObjectID][]primitive.ObjectID, uptimeByMonitor map[primitive.ObjectID][]models.DailyUptime) []UptimeBar {
+func build90DayBars(
+	compID primitive.ObjectID,
+	monitorsByComp map[primitive.ObjectID][]primitive.ObjectID,
+	uptimeByMonitor map[primitive.ObjectID][]models.DailyUptime,
+) []UptimeBar {
+
+	monitorIDs := monitorsByComp[compID]
+
+	if len(monitorIDs) == 0 {
+		return []UptimeBar{}
+	}
+
 	bars := make([]UptimeBar, 90)
 	now := time.Now()
 
 	for i := 89; i >= 0; i-- {
 		day := now.AddDate(0, 0, -i)
 		dayStr := day.Format("2006-01-02")
+
 		bars[89-i] = UptimeBar{
 			Date:          dayStr,
 			UptimePercent: 100.0,
 			Status:        "operational",
 		}
 
-		// Find monitor data for this component on this day
-		monitorIDs := monitorsByComp[compID]
-		if len(monitorIDs) == 0 {
-			continue
-		}
-
 		var totalUp, total int
+
 		for _, mID := range monitorIDs {
 			for _, u := range uptimeByMonitor[mID] {
 				if u.Date.Format("2006-01-02") == dayStr {
@@ -556,17 +563,20 @@ func build90DayBars(compID primitive.ObjectID, monitorsByComp map[primitive.Obje
 		if total > 0 {
 			pct := float64(totalUp) / float64(total) * 100.0
 			bars[89-i].UptimePercent = pct
-			if pct >= 99.9 {
+
+			switch {
+			case pct >= 99.9:
 				bars[89-i].Status = "operational"
-			} else if pct >= 90.0 {
+			case pct >= 90.0:
 				bars[89-i].Status = "degraded_performance"
-			} else if pct >= 50.0 {
+			case pct >= 50.0:
 				bars[89-i].Status = "partial_outage"
-			} else {
+			default:
 				bars[89-i].Status = "major_outage"
 			}
 		}
 	}
+
 	return bars
 }
 
