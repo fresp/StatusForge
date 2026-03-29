@@ -5,6 +5,9 @@ import { useCategorySummary } from '../hooks/useApi'
 import { STATUS_LABELS, formatDate } from '../lib/utils'
 import type { CategoryServiceStatus, ComponentStatus, Incident } from '../types'
 
+const EMPTY_INCIDENTS: Incident[] = []
+const EMPTY_SERVICES: CategoryServiceStatus[] = []
+
 function getStatusToken(status: ComponentStatus): string {
   switch (status) {
     case 'operational':
@@ -157,6 +160,29 @@ function ServiceRow({
   const displayStatus = highestImpact ? impactToStatus(highestImpact) : service.status
   const displayLabel = highestImpact ? impactToLabel(highestImpact) : 'No known issues'
 
+  const incidentsByStatus = useMemo(() => {
+    const grouped = new Map<string, Incident[]>();
+    ['critical', 'major', 'minor', 'none'].forEach(status => grouped.set(status, []));
+    
+    incidents.forEach(incident => {
+      const statusKey = incident.impact.toLowerCase();
+      const current = grouped.get(statusKey) || [];
+      current.push(incident);
+      grouped.set(statusKey, current);
+    });
+    
+    const unknownImpactIncidents = incidents.filter(i => 
+      !['critical', 'major', 'minor'].includes(i.impact.toLowerCase())
+    );
+    if (unknownImpactIncidents.length > 0) {
+      const current = grouped.get('none') || [];
+      current.push(...unknownImpactIncidents);
+      grouped.set('none', current);
+    }
+    
+    return grouped;
+  }, [incidents]);
+
   return (
     <article className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
       <button
@@ -186,11 +212,53 @@ function ServiceRow({
       </button>
 
       {expanded && (
-        <div className="border-t border-[var(--border)] px-5 py-4 space-y-3">
+        <div className="border-t border-[var(--border)] p-0 space-y-4">
           {incidents.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">No known issues.</p>
+            <div className="px-5 py-4">
+              <p className="text-sm text-[var(--text-muted)]">No known issues.</p>
+            </div>
           ) : (
-            incidents.map((incident) => <IncidentSummary key={incident.id} incident={incident} />)
+            <>
+              {Array.from(incidentsByStatus.entries()).map(([status, statusIncidents]) => {
+                if (statusIncidents.length === 0) return null;
+                
+                let statusLabel = '';
+                switch(status) {
+                  case 'critical':
+                    statusLabel = 'Critical Incidents';
+                    break;
+                  case 'major':
+                    statusLabel = 'Major Incidents';
+                    break;
+                  case 'minor':
+                    statusLabel = 'Minor Incidents';
+                    break;
+                  default:
+                    statusLabel = 'Other Incidents';
+                }
+                
+                return (
+                  <div key={status} className="px-5 py-4">
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <span 
+                        className="inline-block w-2 h-2 rounded-full"
+                        style={{ 
+                          backgroundColor: `var(${getStatusToken(impactToStatus(status))})` 
+                        }}
+                      />
+                      {statusLabel} ({statusIncidents.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {statusIncidents.map((incident) => (
+                        <div key={incident.id} className="pl-4 border-l-2" style={{ borderColor: `var(${getStatusToken(impactToStatus(incident.impact))})` }}>
+                          <IncidentSummary incident={incident} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       )}
@@ -202,8 +270,8 @@ export default function StatusCategoryPage() {
   const { categoryPrefix } = useParams<{ categoryPrefix: string }>()
   const { data, loading, error } = useCategorySummary(categoryPrefix)
 
-  const incidents = data?.incidents ?? []
-  const services = data?.services ?? []
+  const incidents = data?.incidents ?? EMPTY_INCIDENTS
+  const services = data?.services ?? EMPTY_SERVICES
   const aggregateStatus: ComponentStatus = data?.aggregateStatus ?? 'operational'
 
   const activeIncidents = useMemo(
@@ -230,7 +298,12 @@ export default function StatusCategoryPage() {
   const [expandedServiceIds, setExpandedServiceIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    setExpandedServiceIds(new Set(defaultExpandedIds))
+    setExpandedServiceIds((current) => {
+      if (current.size === defaultExpandedIds.length && defaultExpandedIds.every((id) => current.has(id))) {
+        return current
+      }
+      return new Set(defaultExpandedIds)
+    })
   }, [defaultExpandedIds])
 
   if (loading) {
