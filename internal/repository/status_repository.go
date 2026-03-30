@@ -13,9 +13,19 @@ import (
 
 type StatusRepository interface {
 	ListComponents(ctx context.Context) ([]models.Component, error)
+	ListComponentsByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.Component, error)
 	ListSubComponentsByComponentIDs(ctx context.Context, componentIDs []primitive.ObjectID) ([]models.SubComponent, error)
+	ListAllSubComponents(ctx context.Context) ([]models.SubComponent, error)
+	ListSubComponentsByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.SubComponent, error)
 	ListMonitorsByTargets(ctx context.Context, componentIDs []primitive.ObjectID, subComponentIDs []primitive.ObjectID) ([]models.Monitor, error)
 	ListDailyUptimeSinceByMonitorIDs(ctx context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.DailyUptime, error)
+	ListActiveIncidents(ctx context.Context) ([]models.Incident, error)
+	ListActiveMaintenanceAt(ctx context.Context, at time.Time) ([]models.Maintenance, error)
+	CountActiveIncidents(ctx context.Context) (int64, error)
+	CountActiveMaintenanceAt(ctx context.Context, at time.Time) (int64, error)
+	FindLatestIncidentByComponent(ctx context.Context, componentID primitive.ObjectID) (*models.Incident, error)
+	ListIncidentsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]models.Incident, error)
+	ListResolvedIncidentsSince(ctx context.Context, since time.Time) ([]models.Incident, error)
 	ListIncidentsByAffectedComponents(ctx context.Context, affectedIDs []primitive.ObjectID, limit int64) ([]models.Incident, error)
 	ListIncidentUpdatesByIncidentIDs(ctx context.Context, incidentIDs []primitive.ObjectID) (map[primitive.ObjectID][]models.IncidentUpdate, error)
 }
@@ -46,6 +56,28 @@ func (r *MongoStatusRepository) ListComponents(ctx context.Context) ([]models.Co
 	return components, nil
 }
 
+func (r *MongoStatusRepository) ListComponentsByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.Component, error) {
+	if len(ids) == 0 {
+		return []models.Component{}, nil
+	}
+
+	cursor, err := r.db.Collection("components").Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var components []models.Component
+	if err := cursor.All(ctx, &components); err != nil {
+		return nil, err
+	}
+	if components == nil {
+		components = []models.Component{}
+	}
+
+	return components, nil
+}
+
 func (r *MongoStatusRepository) ListSubComponentsByComponentIDs(ctx context.Context, componentIDs []primitive.ObjectID) ([]models.SubComponent, error) {
 	if len(componentIDs) == 0 {
 		return []models.SubComponent{}, nil
@@ -56,6 +88,46 @@ func (r *MongoStatusRepository) ListSubComponentsByComponentIDs(ctx context.Cont
 		bson.M{"componentId": bson.M{"$in": componentIDs}},
 		options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}}),
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var subs []models.SubComponent
+	if err := cursor.All(ctx, &subs); err != nil {
+		return nil, err
+	}
+	if subs == nil {
+		subs = []models.SubComponent{}
+	}
+
+	return subs, nil
+}
+
+func (r *MongoStatusRepository) ListAllSubComponents(ctx context.Context) ([]models.SubComponent, error) {
+	cursor, err := r.db.Collection("subcomponents").Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var subs []models.SubComponent
+	if err := cursor.All(ctx, &subs); err != nil {
+		return nil, err
+	}
+	if subs == nil {
+		subs = []models.SubComponent{}
+	}
+
+	return subs, nil
+}
+
+func (r *MongoStatusRepository) ListSubComponentsByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.SubComponent, error) {
+	if len(ids) == 0 {
+		return []models.SubComponent{}, nil
+	}
+
+	cursor, err := r.db.Collection("subcomponents").Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
 	if err != nil {
 		return nil, err
 	}
@@ -128,6 +200,138 @@ func (r *MongoStatusRepository) ListDailyUptimeSinceByMonitorIDs(ctx context.Con
 	}
 
 	return records, nil
+}
+
+func (r *MongoStatusRepository) ListActiveIncidents(ctx context.Context) ([]models.Incident, error) {
+	cursor, err := r.db.Collection("incidents").Find(
+		ctx,
+		bson.M{"status": bson.M{"$ne": models.IncidentResolved}},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var incidents []models.Incident
+	if err := cursor.All(ctx, &incidents); err != nil {
+		return nil, err
+	}
+	if incidents == nil {
+		incidents = []models.Incident{}
+	}
+
+	return incidents, nil
+}
+
+func (r *MongoStatusRepository) ListActiveMaintenanceAt(ctx context.Context, at time.Time) ([]models.Maintenance, error) {
+	cursor, err := r.db.Collection("maintenance").Find(
+		ctx,
+		bson.M{
+			"status":    models.MaintenanceInProgress,
+			"startTime": bson.M{"$lte": at},
+			"endTime":   bson.M{"$gte": at},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var maintenance []models.Maintenance
+	if err := cursor.All(ctx, &maintenance); err != nil {
+		return nil, err
+	}
+	if maintenance == nil {
+		maintenance = []models.Maintenance{}
+	}
+
+	return maintenance, nil
+}
+
+func (r *MongoStatusRepository) CountActiveIncidents(ctx context.Context) (int64, error) {
+	return r.db.Collection("incidents").CountDocuments(ctx, bson.M{"status": bson.M{"$ne": models.IncidentResolved}})
+}
+
+func (r *MongoStatusRepository) CountActiveMaintenanceAt(ctx context.Context, at time.Time) (int64, error) {
+	return r.db.Collection("maintenance").CountDocuments(
+		ctx,
+		bson.M{
+			"status":    models.MaintenanceInProgress,
+			"startTime": bson.M{"$lte": at},
+			"endTime":   bson.M{"$gte": at},
+		},
+	)
+}
+
+func (r *MongoStatusRepository) FindLatestIncidentByComponent(ctx context.Context, componentID primitive.ObjectID) (*models.Incident, error) {
+	var incident models.Incident
+	err := r.db.Collection("incidents").FindOne(
+		ctx,
+		bson.M{
+			"$or": []bson.M{
+				{"affectedComponents": bson.M{"$in": []primitive.ObjectID{componentID}}},
+				{"affectedComponentTargets.componentId": componentID},
+			},
+		},
+		options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
+	).Decode(&incident)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &incident, nil
+}
+
+func (r *MongoStatusRepository) ListIncidentsByCreatedAtRange(ctx context.Context, start, end time.Time) ([]models.Incident, error) {
+	filter := bson.M{"createdAt": bson.M{"$gte": start, "$lt": end}}
+	cursor, err := r.db.Collection("incidents").Find(
+		ctx,
+		filter,
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var incidents []models.Incident
+	if err := cursor.All(ctx, &incidents); err != nil {
+		return nil, err
+	}
+	if incidents == nil {
+		incidents = []models.Incident{}
+	}
+
+	return incidents, nil
+}
+
+func (r *MongoStatusRepository) ListResolvedIncidentsSince(ctx context.Context, since time.Time) ([]models.Incident, error) {
+	cursor, err := r.db.Collection("incidents").Find(
+		ctx,
+		bson.M{
+			"status":     models.IncidentResolved,
+			"resolvedAt": bson.M{"$gte": since},
+		},
+		options.Find().SetSort(bson.D{{Key: "resolvedAt", Value: -1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var incidents []models.Incident
+	if err := cursor.All(ctx, &incidents); err != nil {
+		return nil, err
+	}
+	if incidents == nil {
+		incidents = []models.Incident{}
+	}
+
+	return incidents, nil
 }
 
 func (r *MongoStatusRepository) ListIncidentsByAffectedComponents(ctx context.Context, affectedIDs []primitive.ObjectID, limit int64) ([]models.Incident, error) {

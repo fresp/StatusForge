@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/StatusForge/internal/repository"
+	subcomponentservice "github.com/fresp/StatusForge/internal/services/subcomponent"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func GetSubComponents(db *mongo.Database) gin.HandlerFunc {
@@ -24,39 +24,22 @@ func GetSubComponents(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		filter := bson.M{}
+		var componentID string
 		if cid := c.Param("id"); cid != "" {
-			oid, err := primitive.ObjectIDFromHex(cid)
-			if err == nil {
-				filter["componentId"] = oid
+			if _, err := primitive.ObjectIDFromHex(cid); err == nil {
+				componentID = cid
 			}
 		}
 		if cid := c.Query("componentId"); cid != "" {
-			oid, err := primitive.ObjectIDFromHex(cid)
-			if err == nil {
-				filter["componentId"] = oid
+			if _, err := primitive.ObjectIDFromHex(cid); err == nil {
+				componentID = cid
 			}
 		}
 
-		coll := db.Collection("subcomponents")
-		total64, err := coll.CountDocuments(ctx, filter)
+		service := subcomponentservice.NewService(repository.NewMongoSubComponentRepository(db))
+		subs, total64, err := service.List(ctx, componentID, page, limit)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		skip := int64((page - 1) * limit)
-
-		cursor, err := coll.Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}).SetSkip(skip).SetLimit(int64(limit)))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		defer cursor.Close(ctx)
-
-		var subs []models.SubComponent
-		if err := cursor.All(ctx, &subs); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 		if subs == nil {
@@ -100,8 +83,15 @@ func CreateSubComponent(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if _, err := db.Collection("subcomponents").InsertOne(ctx, sub); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		service := subcomponentservice.NewService(repository.NewMongoSubComponentRepository(db))
+		sub, err = service.Create(ctx, subcomponentservice.CreateInput{
+			ComponentID: req.ComponentID,
+			Name:        req.Name,
+			Description: req.Description,
+			Status:      req.Status,
+		})
+		if err != nil {
+			writeDomainError(c, err)
 			return
 		}
 		c.JSON(http.StatusCreated, sub)
@@ -126,31 +116,20 @@ func UpdateSubComponent(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		setFields := bson.M{}
-		if req.Name != "" {
-			setFields["name"] = req.Name
-		}
-		if req.Description != "" {
-			setFields["description"] = req.Description
-		}
-		if req.Status != "" {
-			setFields["status"] = req.Status
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		var sub models.SubComponent
-		opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-		err = db.Collection("subcomponents").FindOneAndUpdate(ctx, bson.M{"_id": id}, bson.M{"$set": setFields}, opts).Decode(&sub)
-		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusNotFound, gin.H{"error": "subcomponent not found"})
-			return
-		}
+		service := subcomponentservice.NewService(repository.NewMongoSubComponentRepository(db))
+		sub, err := service.Update(ctx, id, subcomponentservice.UpdateInput{
+			Name:        req.Name,
+			Description: req.Description,
+			Status:      req.Status,
+		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
+
 		c.JSON(http.StatusOK, sub)
 	}
 }

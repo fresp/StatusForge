@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/StatusForge/internal/repository"
+	webhookservice "github.com/fresp/StatusForge/internal/services/webhook"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // GetWebhookChannels retrieves all webhook channels from the database.
@@ -25,26 +25,10 @@ func GetWebhookChannels(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		coll := db.Collection("webhook_channels")
-		total64, err := coll.CountDocuments(ctx, bson.M{})
+		service := webhookservice.NewService(repository.NewMongoWebhookChannelRepository(db))
+		channels, total64, err := service.List(ctx, page, limit)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		skip := int64((page - 1) * limit)
-
-		cursor, err := coll.Find(ctx, bson.M{},
-			options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetSkip(skip).SetLimit(int64(limit)))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		defer cursor.Close(ctx)
-
-		var channels []models.WebhookChannel
-		if err := cursor.All(ctx, &channels); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 
@@ -72,16 +56,10 @@ func CreateWebhookChannel(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		channel := models.WebhookChannel{
-			ID:        primitive.NewObjectID(),
-			Name:      req.Name,
-			URL:       req.URL,
-			Enabled:   true,
-			CreatedAt: time.Now(),
-		}
-
-		if _, err := db.Collection("webhook_channels").InsertOne(ctx, channel); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		service := webhookservice.NewService(repository.NewMongoWebhookChannelRepository(db))
+		channel, err := service.Create(ctx, req.Name, req.URL)
+		if err != nil {
+			writeDomainError(c, err)
 			return
 		}
 
@@ -101,14 +79,10 @@ func DeleteWebhookChannel(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		res, err := db.Collection("webhook_channels").DeleteOne(ctx, bson.M{"_id": id})
+		service := webhookservice.NewService(repository.NewMongoWebhookChannelRepository(db))
+		err = service.DeleteByID(ctx, id)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		if res.DeletedCount == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "webhook channel not found"})
+			writeDomainError(c, err)
 			return
 		}
 

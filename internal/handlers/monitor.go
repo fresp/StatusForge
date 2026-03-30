@@ -2,18 +2,19 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
+	shared "github.com/fresp/StatusForge/internal/domain/shared"
 	"github.com/fresp/StatusForge/internal/models"
 	"github.com/fresp/StatusForge/internal/repository"
 	monitorservice "github.com/fresp/StatusForge/internal/services/monitor"
 	"github.com/fresp/StatusForge/internal/utils"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func GetMonitors(db *mongo.Database) gin.HandlerFunc {
@@ -30,7 +31,7 @@ func GetMonitors(db *mongo.Database) gin.HandlerFunc {
 		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
 		monitors, total, err := service.List(ctx, page, limit)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 
@@ -77,11 +78,11 @@ func CreateMonitor(db *mongo.Database) gin.HandlerFunc {
 			SubComponentID:  req.SubComponentID,
 		})
 		if err != nil {
-			if _, ok := err.(*monitorservice.ValidationError); ok {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			if monitorservice.IsValidationError(err) {
+				writeDomainError(c, errorsWrap(err, shared.ErrInvalidInput))
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 
@@ -130,15 +131,15 @@ func UpdateMonitor(db *mongo.Database) gin.HandlerFunc {
 			SubComponentID:  req.SubComponentID,
 		})
 		if err != nil {
-			if _, ok := err.(*monitorservice.ValidationError); ok {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			if monitorservice.IsValidationError(err) {
+				writeDomainError(c, errorsWrap(err, shared.ErrInvalidInput))
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 		if !matched {
-			c.JSON(http.StatusNotFound, gin.H{"error": "monitor not found"})
+			writeDomainError(c, errorsWrap(shared.ErrNotFound, errMonitorNotFound))
 			return
 		}
 
@@ -269,24 +270,13 @@ func GetMonitorLogs(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		limit := int64(100)
-		cursor, err := db.Collection("monitor_logs").Find(ctx,
-			bson.M{"monitorId": monitorID},
-			options.Find().SetSort(bson.D{{Key: "checkedAt", Value: -1}}).SetLimit(limit))
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		logs, err := service.Logs(ctx, monitorID, 100)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
-		defer cursor.Close(ctx)
 
-		var logs []models.MonitorLog
-		if err := cursor.All(ctx, &logs); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		if logs == nil {
-			logs = []models.MonitorLog{}
-		}
 		c.JSON(http.StatusOK, logs)
 	}
 }
@@ -302,24 +292,13 @@ func GetMonitorUptime(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		since := time.Now().AddDate(0, 0, -90)
-		cursor, err := db.Collection("daily_uptime").Find(ctx,
-			bson.M{"monitorId": monitorID, "date": bson.M{"$gte": since}},
-			options.Find().SetSort(bson.D{{Key: "date", Value: 1}}))
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		uptime, err := service.Uptime(ctx, monitorID, time.Now().AddDate(0, 0, -90))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
-		defer cursor.Close(ctx)
 
-		var uptime []models.DailyUptime
-		if err := cursor.All(ctx, &uptime); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		if uptime == nil {
-			uptime = []models.DailyUptime{}
-		}
 		c.JSON(http.StatusOK, uptime)
 	}
 }
@@ -335,13 +314,10 @@ func DeleteMonitor(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		res, err := db.Collection("monitors").DeleteOne(ctx, bson.M{"_id": id})
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		err = service.Delete(ctx, id)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		if res.DeletedCount == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "monitor not found"})
+			writeDomainError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
@@ -353,23 +329,13 @@ func GetMonitorOutages(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		sortField := bson.D{{Key: "startedAt", Value: -1}}
-		cursor, err := db.Collection("outages").Find(ctx, bson.M{},
-			options.Find().SetSort(sortField))
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		outages, err := service.Outages(ctx)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
-		defer cursor.Close(ctx)
 
-		var outages []models.Outage
-		if err := cursor.All(ctx, &outages); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		if outages == nil {
-			outages = []models.Outage{}
-		}
 		c.JSON(http.StatusOK, outages)
 	}
 }
@@ -385,24 +351,24 @@ func GetMonitorHistory(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		limit := int64(100)
-		cursor, err := db.Collection("enhanced_monitor_logs").Find(ctx,
-			bson.M{"monitorId": monitorID},
-			options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(limit))
+		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+		logs, err := service.History(ctx, monitorID, 100)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
-		defer cursor.Close(ctx)
 
-		var logs []models.EnhancedMonitorLog
-		if err := cursor.All(ctx, &logs); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		if logs == nil {
-			logs = []models.EnhancedMonitorLog{}
-		}
 		c.JSON(http.StatusOK, logs)
 	}
 }
+
+var errMonitorNotFound = errorsNew("monitor not found")
+
+func errorsWrap(err error, sentinel error) error {
+	if err == nil {
+		return sentinel
+	}
+	return fmt.Errorf("%w: %v", sentinel, err)
+}
+
+func errorsNew(msg string) error { return errors.New(msg) }

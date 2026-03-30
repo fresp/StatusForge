@@ -2,15 +2,17 @@ package handlers
 
 import (
 	"context"
-	"net/http"
+	"errors"
 	"time"
 
+	shared "github.com/fresp/StatusForge/internal/domain/shared"
 	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/StatusForge/internal/repository"
+	subscriberservice "github.com/fresp/StatusForge/internal/services/subscriber"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"net/http"
 )
 
 func Subscribe(db *mongo.Database) gin.HandlerFunc {
@@ -26,25 +28,17 @@ func Subscribe(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		// Check if already subscribed
-		var existing models.Subscriber
-		err := db.Collection("subscribers").FindOne(ctx, bson.M{"email": req.Email}).Decode(&existing)
-		if err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "email already subscribed"})
+		service := subscriberservice.NewService(repository.NewMongoSubscriberRepository(db))
+		sub, err := service.Create(ctx, req.Email)
+		if err != nil {
+			if isConflictError(err) {
+				c.JSON(http.StatusConflict, gin.H{"error": "email already subscribed"})
+				return
+			}
+			writeDomainError(c, err)
 			return
 		}
 
-		sub := models.Subscriber{
-			ID:        primitive.NewObjectID(),
-			Email:     req.Email,
-			Verified:  false,
-			CreatedAt: time.Now(),
-		}
-
-		if _, err := db.Collection("subscribers").InsertOne(ctx, sub); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
 		c.JSON(http.StatusCreated, gin.H{"message": "subscribed successfully", "id": sub.ID})
 	}
 }
@@ -60,26 +54,10 @@ func GetSubscribers(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		coll := db.Collection("subscribers")
-		total64, err := coll.CountDocuments(ctx, bson.M{})
+		service := subscriberservice.NewService(repository.NewMongoSubscriberRepository(db))
+		subs, total64, err := service.List(ctx, page, limit)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		skip := int64((page - 1) * limit)
-
-		cursor, err := coll.Find(ctx, bson.M{},
-			options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetSkip(skip).SetLimit(int64(limit)))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		defer cursor.Close(ctx)
-
-		var subs []models.Subscriber
-		if err := cursor.All(ctx, &subs); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 		if subs == nil {
@@ -100,15 +78,24 @@ func DeleteSubscriber(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		res, err := db.Collection("subscribers").DeleteOne(ctx, bson.M{"_id": id})
+		service := subscriberservice.NewService(repository.NewMongoSubscriberRepository(db))
+		err = service.DeleteByID(ctx, id)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		if res.DeletedCount == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "subscriber not found"})
+			if isNotFoundError(err) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "subscriber not found"})
+				return
+			}
+			writeDomainError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "unsubscribed"})
 	}
+}
+
+func isConflictError(err error) bool {
+	return errors.Is(err, shared.ErrConflict)
+}
+
+func isNotFoundError(err error) bool {
+	return errors.Is(err, shared.ErrNotFound)
 }

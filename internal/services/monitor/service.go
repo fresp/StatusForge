@@ -2,12 +2,14 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 	"time"
 
+	monitordomain "github.com/fresp/StatusForge/internal/domain/monitor"
+	shared "github.com/fresp/StatusForge/internal/domain/shared"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/fresp/StatusForge/internal/models"
@@ -68,6 +70,33 @@ func (s *Service) Update(ctx context.Context, id primitive.ObjectID, input Monit
 	return s.repo.Update(ctx, id, monitor)
 }
 
+func (s *Service) Delete(ctx context.Context, id primitive.ObjectID) error {
+	deleted, err := s.repo.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return shared.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Service) Logs(ctx context.Context, monitorID primitive.ObjectID, limit int64) ([]models.MonitorLog, error) {
+	return s.repo.ListLogs(ctx, monitorID, limit)
+}
+
+func (s *Service) Uptime(ctx context.Context, monitorID primitive.ObjectID, since time.Time) ([]models.DailyUptime, error) {
+	return s.repo.ListUptime(ctx, monitorID, since)
+}
+
+func (s *Service) Outages(ctx context.Context) ([]models.Outage, error) {
+	return s.repo.ListOutages(ctx)
+}
+
+func (s *Service) History(ctx context.Context, monitorID primitive.ObjectID, limit int64) ([]models.EnhancedMonitorLog, error) {
+	return s.repo.ListHistory(ctx, monitorID, limit)
+}
+
 func SanitizeSSLThresholds(thresholds []int) []int {
 	if len(thresholds) == 0 {
 		return []int{30, 14, 7}
@@ -126,7 +155,7 @@ func ValidateAdvancedOptions(monitorType models.MonitorType, target string, adva
 	}
 
 	if advanced.DomainExpiry {
-		if _, err := extractDomain(target, monitorType); err != nil {
+		if _, err := monitordomain.ExtractDomain(target, string(monitorType)); err != nil {
 			return &ValidationError{Message: fmt.Sprintf("invalid domain target for domain_expiry: %v", err)}
 		}
 	}
@@ -185,6 +214,11 @@ func buildMonitor(input MonitorUpsertInput) (models.Monitor, error) {
 	return monitor, nil
 }
 
+func IsValidationError(err error) bool {
+	var validationErr *ValidationError
+	return errors.As(err, &validationErr)
+}
+
 func supportsDomainExpiry(monitorType models.MonitorType) bool {
 	return monitorType == models.MonitorHTTP || monitorType == models.MonitorSSL
 }
@@ -195,35 +229,4 @@ func supportsCertExpiry(monitorType models.MonitorType) bool {
 
 func supportsIgnoreTLSError(monitorType models.MonitorType) bool {
 	return monitorType == models.MonitorHTTP
-}
-
-func extractDomain(target string, monitorType models.MonitorType) (string, error) {
-	if monitorType == models.MonitorHTTP {
-		u, err := url.Parse(target)
-		if err != nil {
-			return "", err
-		}
-		host := u.Hostname()
-		if host == "" {
-			return "", fmt.Errorf("target has no hostname")
-		}
-		if net.ParseIP(host) != nil {
-			return "", fmt.Errorf("domain_expiry does not support IP targets")
-		}
-		return host, nil
-	}
-
-	host, _, err := net.SplitHostPort(target)
-	if err != nil {
-		host = target
-	}
-	host = strings.TrimSpace(host)
-	if host == "" {
-		return "", fmt.Errorf("empty host")
-	}
-	if net.ParseIP(host) != nil {
-		return "", fmt.Errorf("domain_expiry does not support IP targets")
-	}
-
-	return host, nil
 }

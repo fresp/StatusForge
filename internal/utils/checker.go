@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	monitordomain "github.com/fresp/StatusForge/internal/domain/monitor"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -190,33 +191,7 @@ func CheckDomain(target string, monitorType string, thresholds []int) (DomainChe
 }
 
 func extractDomain(target string, monitorType string) (string, error) {
-	if monitorType == "http" {
-		u, err := url.Parse(target)
-		if err != nil {
-			return "", err
-		}
-		host := u.Hostname()
-		if host == "" {
-			return "", fmt.Errorf("target has no hostname")
-		}
-		if net.ParseIP(host) != nil {
-			return "", fmt.Errorf("domain_expiry does not support IP targets")
-		}
-		return host, nil
-	}
-
-	host, _, err := net.SplitHostPort(target)
-	if err != nil {
-		host = target
-	}
-	host = strings.TrimSpace(host)
-	if host == "" {
-		return "", fmt.Errorf("empty host")
-	}
-	if net.ParseIP(host) != nil {
-		return "", fmt.Errorf("domain_expiry does not support IP targets")
-	}
-	return host, nil
+	return monitordomain.ExtractDomain(target, monitorType)
 }
 
 func lookupDomainExpiry(domain string) (time.Time, error) {

@@ -2,15 +2,17 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
+	shared "github.com/fresp/StatusForge/internal/domain/shared"
 	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/StatusForge/internal/repository"
+	maintenanceservice "github.com/fresp/StatusForge/internal/services/maintenance"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func GetMaintenance(db *mongo.Database) gin.HandlerFunc {
@@ -24,32 +26,18 @@ func GetMaintenance(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		coll := db.Collection("maintenance")
-		total64, err := coll.CountDocuments(ctx, bson.M{})
+		service := maintenanceservice.NewService(repository.NewMongoMaintenanceRepository(db))
+		items, total, err := service.List(ctx, page, limit)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 
-		skip := int64((page - 1) * limit)
-
-		cursor, err := coll.Find(ctx, bson.M{},
-			options.Find().SetSort(bson.D{{Key: "startTime", Value: -1}}).SetSkip(skip).SetLimit(int64(limit)))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		defer cursor.Close(ctx)
-
-		var items []models.Maintenance
-		if err := cursor.All(ctx, &items); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
 		if items == nil {
 			items = []models.Maintenance{}
 		}
-		writePaginatedResponse(c, items, int(total64), page, limit)
+
+		writePaginatedResponse(c, items, int(total), page, limit)
 	}
 }
 
@@ -64,39 +52,18 @@ func GetPublicMaintenance(db *mongo.Database) gin.HandlerFunc {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		filter := bson.M{
-			"status": bson.M{"$ne": "completed"},
-		}
-
-		coll := db.Collection("maintenance")
-		total64, err := coll.CountDocuments(ctx, filter)
+		service := maintenanceservice.NewService(repository.NewMongoMaintenanceRepository(db))
+		items, total, err := service.ListPublic(ctx, page, limit)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
 
-		skip := int64((page - 1) * limit)
-
-		cursor, err := coll.Find(
-			ctx,
-			filter,
-			options.Find().SetSort(bson.D{{Key: "startTime", Value: -1}}).SetSkip(skip).SetLimit(int64(limit)),
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		defer cursor.Close(ctx)
-
-		var items []models.Maintenance
-		if err := cursor.All(ctx, &items); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
 		if items == nil {
 			items = []models.Maintenance{}
 		}
-		writePaginatedResponse(c, items, int(total64), page, limit)
+
+		writePaginatedResponse(c, items, int(total), page, limit)
 	}
 }
 
@@ -114,73 +81,39 @@ func CreateMaintenance(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		startTime, err := time.Parse(time.RFC3339, req.StartTime)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid startTime format, use RFC3339"})
-			return
-		}
-		endTime, err := time.Parse(time.RFC3339, req.EndTime)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid endTime format, use RFC3339"})
-			return
-		}
-
 		rawUserID, exists := c.Get("userId")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authenticated user context"})
+			writeDomainError(c, fmt.Errorf("%w: missing authenticated user context", shared.ErrUnauthorized))
 			return
 		}
 
 		userIDHex, ok := rawUserID.(string)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user context"})
-			return
-		}
-
-		userID, err := primitive.ObjectIDFromHex(userIDHex)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authenticated user id"})
+			writeDomainError(c, fmt.Errorf("%w: invalid authenticated user context", shared.ErrUnauthorized))
 			return
 		}
 
 		creatorUsername, _ := c.Get("username")
 		creatorName, _ := creatorUsername.(string)
 
-		var compIDs []primitive.ObjectID
-		for _, s := range req.Components {
-			oid, err := primitive.ObjectIDFromHex(s)
-			if err == nil {
-				compIDs = append(compIDs, oid)
-			}
-		}
-		if compIDs == nil {
-			compIDs = []primitive.ObjectID{}
-		}
-
-		status := models.MaintenanceScheduled
-		if time.Now().After(startTime) {
-			status = models.MaintenanceInProgress
-		}
-
-		m := models.Maintenance{
-			ID:              primitive.NewObjectID(),
-			Title:           req.Title,
-			Description:     req.Description,
-			CreatorID:       &userID,
-			CreatorUsername: creatorName,
-			Components:      compIDs,
-			StartTime:       startTime,
-			EndTime:         endTime,
-			Status:          status,
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		if _, err := db.Collection("maintenance").InsertOne(ctx, m); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		service := maintenanceservice.NewService(repository.NewMongoMaintenanceRepository(db))
+		m, err := service.Create(ctx, maintenanceservice.CreateInput{
+			Title:           req.Title,
+			Description:     req.Description,
+			Components:      req.Components,
+			StartTime:       req.StartTime,
+			EndTime:         req.EndTime,
+			CreatorIDHex:    userIDHex,
+			CreatorUsername: creatorName,
+		})
+		if err != nil {
+			writeDomainError(c, err)
 			return
 		}
+
 		DispatchWebhookEvent(db, "maintenance_created", m)
 		c.JSON(http.StatusCreated, m)
 	}
@@ -206,43 +139,22 @@ func UpdateMaintenance(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
-		setFields := bson.M{}
-		if req.Title != "" {
-			setFields["title"] = req.Title
-		}
-		if req.Description != "" {
-			setFields["description"] = req.Description
-		}
-		if req.Status != "" {
-			setFields["status"] = req.Status
-		}
-		if req.StartTime != "" {
-			t, err := time.Parse(time.RFC3339, req.StartTime)
-			if err == nil {
-				setFields["startTime"] = t
-			}
-		}
-		if req.EndTime != "" {
-			t, err := time.Parse(time.RFC3339, req.EndTime)
-			if err == nil {
-				setFields["endTime"] = t
-			}
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		var m models.Maintenance
-		opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
-		err = db.Collection("maintenance").FindOneAndUpdate(ctx, bson.M{"_id": id}, bson.M{"$set": setFields}, opts).Decode(&m)
-		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusNotFound, gin.H{"error": "maintenance not found"})
-			return
-		}
+		service := maintenanceservice.NewService(repository.NewMongoMaintenanceRepository(db))
+		m, err := service.Update(ctx, id, maintenanceservice.UpdateInput{
+			Title:       req.Title,
+			Description: req.Description,
+			Status:      req.Status,
+			StartTime:   req.StartTime,
+			EndTime:     req.EndTime,
+		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeDomainError(c, err)
 			return
 		}
+
 		DispatchWebhookEvent(db, "maintenance_updated", m)
 		c.JSON(http.StatusOK, m)
 	}

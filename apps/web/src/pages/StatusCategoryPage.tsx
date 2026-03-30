@@ -178,7 +178,7 @@ function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; i
       </div>
 
       {hasMonitoringData ? (
-        <div className="py-4">
+        <div className="py-2">
           <UptimeTimeline
             history={service.uptimeHistory}
             showAverage
@@ -186,7 +186,7 @@ function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; i
           />
         </div>
       ) : (
-        <div className="py-4"></div>
+        <div className="py-2"></div>
       )}
       {activeIncidents.length > 0 ? (
         <div
