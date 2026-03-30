@@ -17,7 +17,10 @@ type StatusRepository interface {
 	ListSubComponentsByComponentIDs(ctx context.Context, componentIDs []primitive.ObjectID) ([]models.SubComponent, error)
 	ListAllSubComponents(ctx context.Context) ([]models.SubComponent, error)
 	ListSubComponentsByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.SubComponent, error)
+	FindMonitorByID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error)
 	ListMonitorsByTargets(ctx context.Context, componentIDs []primitive.ObjectID, subComponentIDs []primitive.ObjectID) ([]models.Monitor, error)
+	ListMonitorsByServiceID(ctx context.Context, serviceID primitive.ObjectID) ([]models.Monitor, error)
+	ListMonitorLogsByMonitorIDsSince(ctx context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.MonitorLog, error)
 	ListDailyUptimeSinceByMonitorIDs(ctx context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.DailyUptime, error)
 	ListActiveIncidents(ctx context.Context) ([]models.Incident, error)
 	ListActiveMaintenanceAt(ctx context.Context, at time.Time) ([]models.Maintenance, error)
@@ -172,6 +175,74 @@ func (r *MongoStatusRepository) ListMonitorsByTargets(ctx context.Context, compo
 	}
 
 	return monitors, nil
+}
+
+func (r *MongoStatusRepository) FindMonitorByID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error) {
+	var monitor models.Monitor
+	err := r.db.Collection("monitors").FindOne(ctx, bson.M{"_id": id}).Decode(&monitor)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &monitor, nil
+}
+
+func (r *MongoStatusRepository) ListMonitorsByServiceID(ctx context.Context, serviceID primitive.ObjectID) ([]models.Monitor, error) {
+	cursor, err := r.db.Collection("monitors").Find(
+		ctx,
+		bson.M{
+			"$or": []bson.M{
+				{"componentId": serviceID},
+				{"subComponentId": serviceID},
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var monitors []models.Monitor
+	if err := cursor.All(ctx, &monitors); err != nil {
+		return nil, err
+	}
+	if monitors == nil {
+		monitors = []models.Monitor{}
+	}
+
+	return monitors, nil
+}
+
+func (r *MongoStatusRepository) ListMonitorLogsByMonitorIDsSince(ctx context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.MonitorLog, error) {
+	if len(monitorIDs) == 0 {
+		return []models.MonitorLog{}, nil
+	}
+
+	cursor, err := r.db.Collection("monitor_logs").Find(
+		ctx,
+		bson.M{
+			"monitorId": bson.M{"$in": monitorIDs},
+			"checkedAt": bson.M{"$gte": since},
+		},
+		options.Find().SetSort(bson.D{{Key: "checkedAt", Value: 1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var logs []models.MonitorLog
+	if err := cursor.All(ctx, &logs); err != nil {
+		return nil, err
+	}
+	if logs == nil {
+		logs = []models.MonitorLog{}
+	}
+
+	return logs, nil
 }
 
 func (r *MongoStatusRepository) ListDailyUptimeSinceByMonitorIDs(ctx context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.DailyUptime, error) {

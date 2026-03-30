@@ -155,6 +155,24 @@ export interface DailyUptime {
   uptimePercent: number
 }
 
+export interface MonitorMetrics {
+  latency?: {
+    p90?: number | null
+    p99?: number | null
+  } | null
+  availability?: {
+    last30Days?: number | null
+  } | null
+  history: Array<{
+    month: string
+    latency?: {
+      p90?: number | null
+      p99?: number | null
+    } | null
+    availability?: number | null
+  }>
+}
+
 export interface Subscriber {
   id: string
   email: string

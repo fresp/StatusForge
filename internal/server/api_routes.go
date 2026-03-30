@@ -98,6 +98,7 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 	adminOnly.GET("/monitors/:id/uptime", handlers.GetMonitorUptime(database.GetDB()))
 	adminOnly.GET("/monitors/:id/history", handlers.GetMonitorHistory(database.GetDB()))
 	adminOnly.GET("/monitors/outages", handlers.GetMonitorOutages(database.GetDB()))
+	api.GET("/v1/monitors/:id/metrics", handlers.GetMonitorMetrics(database.GetDB()))
 
 	adminOnly.GET("/subscribers", handlers.GetSubscribers(database.GetDB()))
 	adminOnly.DELETE("/subscribers/:id", handlers.DeleteSubscriber(database.GetDB()))

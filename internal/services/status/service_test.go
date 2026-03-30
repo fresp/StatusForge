@@ -17,6 +17,8 @@ type stubStatusRepo struct {
 	subComponents           []models.SubComponent
 	subComponentsByID       map[primitive.ObjectID]models.SubComponent
 	monitors                []models.Monitor
+	monitorsByService       []models.Monitor
+	monitorLogs             []models.MonitorLog
 	dailyUptime             []models.DailyUptime
 	incidentsByAffected     []models.Incident
 	incidentUpdates         map[primitive.ObjectID][]models.IncidentUpdate
@@ -73,6 +75,46 @@ func (r *stubStatusRepo) ListMonitorsByTargets(_ context.Context, componentIDs [
 		if _, ok := allowedSubs[monitor.SubComponentID]; ok {
 			result = append(result, monitor)
 		}
+	}
+
+	return result, r.err
+}
+
+func (r *stubStatusRepo) ListMonitorsByServiceID(_ context.Context, _ primitive.ObjectID) ([]models.Monitor, error) {
+	return r.monitorsByService, r.err
+}
+
+func (r *stubStatusRepo) FindMonitorByID(_ context.Context, id primitive.ObjectID) (*models.Monitor, error) {
+	for _, monitor := range r.monitorsByService {
+		if monitor.ID == id {
+			m := monitor
+			return &m, r.err
+		}
+	}
+	for _, monitor := range r.monitors {
+		if monitor.ID == id {
+			m := monitor
+			return &m, r.err
+		}
+	}
+	return nil, r.err
+}
+
+func (r *stubStatusRepo) ListMonitorLogsByMonitorIDsSince(_ context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.MonitorLog, error) {
+	allowed := map[primitive.ObjectID]struct{}{}
+	for _, id := range monitorIDs {
+		allowed[id] = struct{}{}
+	}
+
+	result := make([]models.MonitorLog, 0)
+	for _, log := range r.monitorLogs {
+		if _, ok := allowed[log.MonitorID]; !ok {
+			continue
+		}
+		if log.CheckedAt.Before(since) {
+			continue
+		}
+		result = append(result, log)
 	}
 
 	return result, r.err
@@ -333,4 +375,94 @@ func TestBuildIncidentsDefaultsToRecentWindowAndExpandsTargets(t *testing.T) {
 	require.Len(t, response.Active[0].AffectedComponentTargets[0].SubComponents, 1)
 	assert.Equal(t, "Worker", response.Active[0].AffectedComponentTargets[0].SubComponents[0].Name)
 	require.Len(t, response.Active[0].Updates, 1)
+}
+
+func TestBuildServiceMetricsAggregatesLatencyAvailabilityAndMonthlyHistory(t *testing.T) {
+	serviceID := primitive.NewObjectID()
+	monitorID := primitive.NewObjectID()
+	now := time.Date(2026, 3, 31, 12, 0, 0, 0, time.UTC)
+
+	repo := &stubStatusRepo{
+		monitorsByService: []models.Monitor{{ID: monitorID}},
+		monitorLogs: []models.MonitorLog{
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 100, CheckedAt: time.Date(2026, 1, 10, 8, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 200, CheckedAt: time.Date(2026, 1, 20, 8, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorDown, ResponseTime: 300, CheckedAt: time.Date(2026, 2, 1, 8, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 400, CheckedAt: time.Date(2026, 2, 10, 8, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 500, CheckedAt: time.Date(2026, 2, 20, 8, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 100, CheckedAt: time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 200, CheckedAt: time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorDown, ResponseTime: 300, CheckedAt: time.Date(2026, 3, 3, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 400, CheckedAt: time.Date(2026, 3, 4, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 500, CheckedAt: time.Date(2026, 3, 5, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 600, CheckedAt: time.Date(2026, 3, 6, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 700, CheckedAt: time.Date(2026, 3, 7, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorDown, ResponseTime: 800, CheckedAt: time.Date(2026, 3, 8, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 900, CheckedAt: time.Date(2026, 3, 9, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 1000, CheckedAt: time.Date(2026, 3, 10, 9, 0, 0, 0, time.UTC)},
+		},
+	}
+
+	svc := NewService(repo)
+	metrics, err := svc.BuildServiceMetrics(context.Background(), serviceID, now)
+	require.NoError(t, err)
+	require.NotNil(t, metrics)
+	require.NotNil(t, metrics.Latency)
+	require.NotNil(t, metrics.Availability)
+
+	assert.Equal(t, float64(900), metrics.Latency.P90)
+	assert.Equal(t, float64(1000), metrics.Latency.P99)
+	assert.InDelta(t, 77.777, metrics.Availability.Last30Days, 0.001)
+
+	require.NotEmpty(t, metrics.History)
+	assert.Equal(t, "January 2026", metrics.History[0].Month)
+	assert.Equal(t, float64(200), metrics.History[0].Latency.P90)
+	assert.Equal(t, float64(200), metrics.History[0].Latency.P99)
+	assert.InDelta(t, 100.0, metrics.History[0].Availability, 0.001)
+
+	assert.Equal(t, "February 2026", metrics.History[1].Month)
+	assert.Equal(t, float64(500), metrics.History[1].Latency.P90)
+	assert.Equal(t, float64(500), metrics.History[1].Latency.P99)
+	assert.InDelta(t, 66.666, metrics.History[1].Availability, 0.01)
+
+	assert.Equal(t, "March 2026", metrics.History[2].Month)
+	assert.Equal(t, float64(900), metrics.History[2].Latency.P90)
+	assert.Equal(t, float64(1000), metrics.History[2].Latency.P99)
+	assert.InDelta(t, 80.0, metrics.History[2].Availability, 0.001)
+}
+
+func TestBuildServiceMetricsReturnsEmptyMetricsWhenServiceHasNoMonitors(t *testing.T) {
+	svc := NewService(&stubStatusRepo{monitorsByService: []models.Monitor{}})
+	metrics, err := svc.BuildServiceMetrics(context.Background(), primitive.NewObjectID(), time.Now().UTC())
+	require.NoError(t, err)
+	require.NotNil(t, metrics)
+	assert.Nil(t, metrics.Latency)
+	assert.Nil(t, metrics.Availability)
+	assert.Empty(t, metrics.History)
+}
+
+func TestBuildServiceMetricsHistoryContainsOnlyLastThreeMonths(t *testing.T) {
+	serviceID := primitive.NewObjectID()
+	monitorID := primitive.NewObjectID()
+	now := time.Date(2026, 3, 31, 12, 0, 0, 0, time.UTC)
+
+	repo := &stubStatusRepo{
+		monitorsByService: []models.Monitor{{ID: monitorID}},
+		monitorLogs: []models.MonitorLog{
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 100, CheckedAt: time.Date(2025, 12, 31, 23, 59, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 200, CheckedAt: time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 300, CheckedAt: time.Date(2026, 2, 15, 9, 0, 0, 0, time.UTC)},
+			{MonitorID: monitorID, Status: models.MonitorUp, ResponseTime: 400, CheckedAt: time.Date(2026, 3, 15, 9, 0, 0, 0, time.UTC)},
+		},
+	}
+
+	svc := NewService(repo)
+	metrics, err := svc.BuildServiceMetrics(context.Background(), serviceID, now)
+	require.NoError(t, err)
+	require.NotNil(t, metrics)
+
+	require.Len(t, metrics.History, 3)
+	assert.Equal(t, "January 2026", metrics.History[0].Month)
+	assert.Equal(t, "February 2026", metrics.History[1].Month)
+	assert.Equal(t, "March 2026", metrics.History[2].Month)
 }

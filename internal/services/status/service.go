@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -72,6 +73,32 @@ type IncidentStatusInfo struct {
 type IncidentsResponse struct {
 	Active   []models.IncidentWithUpdates `json:"active"`
 	Resolved []models.IncidentWithUpdates `json:"resolved"`
+}
+
+type ServiceLatencyMetrics struct {
+	P90 float64 `json:"p90"`
+	P99 float64 `json:"p99"`
+}
+
+type ServiceAvailabilityMetrics struct {
+	Last30Days float64 `json:"last30Days"`
+}
+
+type ServiceMetricsHistoryEntry struct {
+	Month        string                `json:"month"`
+	Latency      ServiceLatencyMetrics `json:"latency"`
+	Availability float64               `json:"availability"`
+}
+
+type ServiceMetrics struct {
+	Latency      *ServiceLatencyMetrics       `json:"latency,omitempty"`
+	Availability *ServiceAvailabilityMetrics  `json:"availability,omitempty"`
+	History      []ServiceMetricsHistoryEntry `json:"history"`
+}
+
+type ResolvedServiceMetricsInput struct {
+	ServiceID primitive.ObjectID
+	Now       time.Time
 }
 
 type derivedStatusResult struct {
@@ -585,6 +612,121 @@ func (s *Service) BuildIncidents(ctx context.Context, now time.Time, startDate, 
 		Active:   activeWithUpdates,
 		Resolved: resolvedWithUpdates,
 	}, nil
+}
+
+func (s *Service) BuildServiceMetrics(ctx context.Context, serviceID primitive.ObjectID, now time.Time) (*ServiceMetrics, error) {
+	monitors, err := s.repo.ListMonitorsByServiceID(ctx, serviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(monitors) == 0 {
+		return &ServiceMetrics{History: []ServiceMetricsHistoryEntry{}}, nil
+	}
+
+	monitorIDs := make([]primitive.ObjectID, 0, len(monitors))
+	for _, monitor := range monitors {
+		monitorIDs = append(monitorIDs, monitor.ID)
+	}
+
+	historyStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).AddDate(0, -2, 0)
+	logs, err := s.repo.ListMonitorLogsByMonitorIDsSince(ctx, monitorIDs, historyStart)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(logs) == 0 {
+		return &ServiceMetrics{History: []ServiceMetricsHistoryEntry{}}, nil
+	}
+
+	latencies := make([]int64, 0, len(logs))
+	last30Cutoff := now.UTC().Add(-30 * 24 * time.Hour)
+	last30Total := 0
+	last30Up := 0
+
+	monthToLogs := map[time.Time][]models.MonitorLog{}
+	for _, log := range logs {
+		latencies = append(latencies, log.ResponseTime)
+
+		if !log.CheckedAt.Before(last30Cutoff) {
+			last30Total++
+			if log.Status == models.MonitorUp {
+				last30Up++
+			}
+		}
+
+		monthStart := time.Date(log.CheckedAt.Year(), log.CheckedAt.Month(), 1, 0, 0, 0, 0, time.UTC)
+		monthToLogs[monthStart] = append(monthToLogs[monthStart], log)
+	}
+
+	metrics := &ServiceMetrics{
+		History: make([]ServiceMetricsHistoryEntry, 0, len(monthToLogs)),
+	}
+
+	if len(latencies) > 0 {
+		metrics.Latency = &ServiceLatencyMetrics{
+			P90: percentile(latencies, 90),
+			P99: percentile(latencies, 99),
+		}
+	}
+
+	if last30Total > 0 {
+		metrics.Availability = &ServiceAvailabilityMetrics{
+			Last30Days: (float64(last30Up) / float64(last30Total)) * 100,
+		}
+	}
+
+	months := make([]time.Time, 0, len(monthToLogs))
+	for month := range monthToLogs {
+		months = append(months, month)
+	}
+	sort.Slice(months, func(i, j int) bool {
+		return months[i].Before(months[j])
+	})
+
+	for _, month := range months {
+		monthlyLogs := monthToLogs[month]
+		monthlyLatencies := make([]int64, 0, len(monthlyLogs))
+		monthlyUp := 0
+		for _, log := range monthlyLogs {
+			monthlyLatencies = append(monthlyLatencies, log.ResponseTime)
+			if log.Status == models.MonitorUp {
+				monthlyUp++
+			}
+		}
+
+		metrics.History = append(metrics.History, ServiceMetricsHistoryEntry{
+			Month: month.Format("January 2006"),
+			Latency: ServiceLatencyMetrics{
+				P90: percentile(monthlyLatencies, 90),
+				P99: percentile(monthlyLatencies, 99),
+			},
+			Availability: (float64(monthlyUp) / float64(len(monthlyLogs))) * 100,
+		})
+	}
+
+	return metrics, nil
+}
+
+func percentile(values []int64, p float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	ordered := append([]int64(nil), values...)
+	sort.Slice(ordered, func(i, j int) bool {
+		return ordered[i] < ordered[j]
+	})
+
+	rank := int(math.Ceil((p / 100) * float64(len(ordered))))
+	if rank < 1 {
+		rank = 1
+	}
+	if rank > len(ordered) {
+		rank = len(ordered)
+	}
+
+	return float64(ordered[rank-1])
 }
 
 var ErrCategoryNotFound = fmt.Errorf("category not found")

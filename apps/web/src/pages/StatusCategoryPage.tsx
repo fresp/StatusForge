@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { AlertCircle, AlertTriangle, CheckCircle, ChevronRight, Wrench, XCircle } from 'lucide-react'
+import { AlertCircle, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, ChevronUp, Wrench, XCircle } from 'lucide-react'
 import { useApi, useCategorySummary } from '../hooks/useApi'
 import { STATUS_LABELS } from '../lib/utils'
-import type { CategoryServiceStatus, ComponentStatus, Incident, StatusPageSettings } from '../types'
+import type { CategoryServiceStatus, ComponentStatus, Incident, MonitorMetrics, StatusPageSettings } from '../types'
 import Footer from '../components/layout/Footer'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { UptimeTimeline } from '../components/status/UptimeTimeline'
@@ -146,15 +146,58 @@ function PlatformStatus({ data, aggregateStatus }: { data: NonNullable<ReturnTyp
 function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; incidents: Incident[] }) {
   const activeIncidents = incidents.filter((incident) => isIncidentActive(incident.status))
   const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set())
+  const [metricsExpanded, setMetricsExpanded] = useState(false)
   const highestImpact = activeIncidents.reduce<string>((current, incident) => {
     return impactRank(incident.impact) > impactRank(current) ? incident.impact : current
   }, '')
   const hasMonitoringData = service.uptimeHistory.length > 0
   const displayStatus = highestImpact ? impactToStatus(highestImpact) : service.status
   const displayLabel = STATUS_LABELS[displayStatus] ?? 'Unknown status'
+  const {
+    data: metrics,
+    loading: metricsLoading,
+  } = useApi<MonitorMetrics>(`/v1/monitors/${service.id}/metrics`, [service.id])
+
+  const formatLatency = (value: number | null | undefined): string => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return '-'
+    }
+
+    return `${Math.round(value)} ms`
+  }
+
+  const formatAvailability = (value: number | null | undefined): string => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return '—'
+    }
+
+    return `${value.toFixed(1)}%`
+  }
+
+  const availabilityDotClass = (value: number | null | undefined): string => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return 'bg-[var(--text-subtle)]'
+    }
+
+    if (value >= 99) {
+      return 'bg-emerald-500'
+    }
+
+    if (value >= 95) {
+      return 'bg-amber-500'
+    }
+
+    return 'bg-red-500'
+  }
+
+  const historyRows = metrics?.history ?? []
+  const hasMetricsData = historyRows.length > 0
+
+  const p90 = metrics?.latency?.p90
+  const p99 = metrics?.latency?.p99
 
   return (
-    <article className='py-2'>
+    <article className='py-2 space-y-4'>
       <div className="flex items-center justify-between gap-4">
         <div>
           <h3 className="text-base font-semibold">{service.name}</h3>
@@ -177,7 +220,7 @@ function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; i
         </div>
       </div>
 
-      {hasMonitoringData ? (
+      {hasMonitoringData && (
         <div className="py-2">
           <UptimeTimeline
             history={service.uptimeHistory}
@@ -185,9 +228,93 @@ function ServiceCard({ service, incidents }: { service: CategoryServiceStatus; i
             average={service.uptime90d}
           />
         </div>
-      ) : (
-        <div className="py-2"></div>
       )}
+
+      {hasMetricsData && (
+        <section
+          className="rounded-md border bg-[var(--surface)] p-5"
+          style={{
+            borderColor: 'var(--border)',
+          }}
+        >
+          {metricsLoading ? (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-4 w-20 rounded bg-[var(--surface-uptime)]" />
+              <div className="h-8 w-80 max-w-full rounded bg-[var(--surface-uptime)]" />
+            </div>
+          ) : (
+            <>
+              <h4 className="text-sm font-semibold">Latency</h4>
+              <p className="mt-2 text-2xl font-semibold leading-tight">
+                {formatLatency(p90)}
+                <span className="ml-2 text-sm font-medium text-[var(--text-muted)] align-middle">
+                  (P90), {formatLatency(p99)} (P99) last 31 days
+                </span>
+              </p>
+
+              <div className="mt-4 border-t border-[var(--border)] pt-3">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text)]"
+                  onClick={() => setMetricsExpanded((current) => !current)}
+                  aria-expanded={metricsExpanded}
+                >
+                  {metricsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  Historical latency and availability
+                </button>
+
+                {metricsExpanded && (
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                          <th className="py-2 pr-4 font-medium">Month</th>
+                          <th className="py-2 pr-4 font-medium">Latency (P90)</th>
+                          <th className="py-2 pr-4 font-medium">Latency (P99)</th>
+                          <th className="py-2 pr-2 font-medium">Availability</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyRows.length > 0 ? (
+                          historyRows.map((entry) => {
+                            const availability = entry.availability
+                            const hasAvailability = typeof availability === 'number' && !Number.isNaN(availability)
+
+                            return (
+                              <tr key={entry.month} className="border-b border-[var(--border)] last:border-b-0">
+                                <td className="py-2 pr-4 text-[var(--text)]">{entry.month}</td>
+                                <td className="py-2 pr-4 text-[var(--text)]">{formatLatency(entry.latency?.p90)}</td>
+                                <td className="py-2 pr-4 text-[var(--text)]">{formatLatency(entry.latency?.p99)}</td>
+                                <td className="py-2 pr-2 text-[var(--text)]">
+                                  {hasAvailability ? (
+                                    <span className="inline-flex items-center gap-2">
+                                      <span className={`inline-block h-2.5 w-2.5 rounded-full ${availabilityDotClass(availability)}`} />
+                                      {formatAvailability(availability)}
+                                    </span>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        ) : (
+                          <tr>
+                            <td className="py-3 text-[var(--text-muted)]" colSpan={4}>
+                              No historical metrics available.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       {activeIncidents.length > 0 ? (
         <div
           className="rounded-md border p-5"

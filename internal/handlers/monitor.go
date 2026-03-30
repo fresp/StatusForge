@@ -11,11 +11,20 @@ import (
 	"github.com/fresp/StatusForge/internal/models"
 	"github.com/fresp/StatusForge/internal/repository"
 	monitorservice "github.com/fresp/StatusForge/internal/services/monitor"
+	statusservice "github.com/fresp/StatusForge/internal/services/status"
 	"github.com/fresp/StatusForge/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+type monitorMetricsBuilder interface {
+	BuildServiceMetrics(ctx context.Context, serviceID primitive.ObjectID, now time.Time) (*statusservice.ServiceMetrics, error)
+}
+
+type monitorLookup interface {
+	FindMonitorByID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error)
+}
 
 func GetMonitors(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -359,6 +368,61 @@ func GetMonitorHistory(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, logs)
+	}
+}
+
+func GetMonitorMetrics(db *mongo.Database) gin.HandlerFunc {
+	builder := statusservice.NewService(repository.NewMongoStatusRepository(db))
+	repo := repository.NewMongoStatusRepository(db)
+	return getMonitorMetricsWithBuilderAndLookup(builder, repo, time.Now)
+}
+
+func getMonitorMetricsWithBuilder(builder monitorMetricsBuilder, nowFn func() time.Time) gin.HandlerFunc {
+	return getMonitorMetricsWithBuilderAndLookup(builder, nil, nowFn)
+}
+
+func getMonitorMetricsWithBuilderAndLookup(builder monitorMetricsBuilder, lookup monitorLookup, nowFn func() time.Time) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		monitorID, err := primitive.ObjectIDFromHex(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid monitor id"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		serviceID := monitorID
+		if lookup != nil {
+			monitor, err := lookup.FindMonitorByID(ctx, monitorID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve monitor metrics"})
+				return
+			}
+			if monitor == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "monitor not found"})
+				return
+			}
+
+			if !monitor.SubComponentID.IsZero() {
+				serviceID = monitor.SubComponentID
+			} else if !monitor.ComponentID.IsZero() {
+				serviceID = monitor.ComponentID
+			}
+		}
+
+		metrics, err := builder.BuildServiceMetrics(ctx, serviceID, nowFn().UTC())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build monitor metrics"})
+			return
+		}
+
+		if metrics == nil {
+			c.JSON(http.StatusOK, &statusservice.ServiceMetrics{History: []statusservice.ServiceMetricsHistoryEntry{}})
+			return
+		}
+
+		c.JSON(http.StatusOK, metrics)
 	}
 }
 
