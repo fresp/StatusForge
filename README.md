@@ -42,9 +42,9 @@ StatusForge includes documentation images under `docs/screenshots/`.
 |---|---|---|
 | ![Public Status Page](docs/screenshots/public-statuspage.png) | ![Admin Dashboard](docs/screenshots/admin-dashboard.png) | ![Admin Setting](docs/screenshots/admin-settings.png) |
 
-| Incident History| Monitoring | Maintenance |
-|---|---|---|
-| ![Incident History](docs/screenshots/incident-history.png) | ![Monitoring](docs/screenshots/admin-monitoring.png) | ![Maintenance](docs/screenshots/admin-maintenance.png) |
+| Incident History| Monitoring | Maintenance | Service Info |
+|---|---|---|---|
+| ![Incident History](docs/screenshots/incident-history.png) | ![Monitoring](docs/screenshots/admin-monitoring.png) | ![Maintenance](docs/screenshots/admin-maintenance.png) | ![Service Info](docs/screenshots/public-service-info.png) |
 
 ## Architecture Diagram
 

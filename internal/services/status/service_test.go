@@ -100,6 +100,24 @@ func (r *stubStatusRepo) FindMonitorByID(_ context.Context, id primitive.ObjectI
 	return nil, r.err
 }
 
+func (r *stubStatusRepo) FindMonitorBySubComponentID(_ context.Context, subComponentID primitive.ObjectID) (*models.Monitor, error) {
+	for _, monitor := range r.monitorsByService {
+		if monitor.SubComponentID == subComponentID {
+			m := monitor
+			return &m, r.err
+		}
+	}
+
+	for _, monitor := range r.monitors {
+		if monitor.SubComponentID == subComponentID {
+			m := monitor
+			return &m, r.err
+		}
+	}
+
+	return nil, r.err
+}
+
 func (r *stubStatusRepo) ListMonitorLogsByMonitorIDsSince(_ context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.MonitorLog, error) {
 	allowed := map[primitive.ObjectID]struct{}{}
 	for _, id := range monitorIDs {

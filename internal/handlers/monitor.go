@@ -23,7 +23,7 @@ type monitorMetricsBuilder interface {
 }
 
 type monitorLookup interface {
-	FindMonitorByID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error)
+	FindMonitorBySubComponentID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error)
 }
 
 func GetMonitors(db *mongo.Database) gin.HandlerFunc {
@@ -394,7 +394,7 @@ func getMonitorMetricsWithBuilderAndLookup(builder monitorMetricsBuilder, lookup
 
 		serviceID := monitorID
 		if lookup != nil {
-			monitor, err := lookup.FindMonitorByID(ctx, monitorID)
+			monitor, err := lookup.FindMonitorBySubComponentID(ctx, monitorID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve monitor metrics"})
 				return

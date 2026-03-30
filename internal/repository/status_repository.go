@@ -18,6 +18,7 @@ type StatusRepository interface {
 	ListAllSubComponents(ctx context.Context) ([]models.SubComponent, error)
 	ListSubComponentsByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.SubComponent, error)
 	FindMonitorByID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error)
+	FindMonitorBySubComponentID(ctx context.Context, subComponentID primitive.ObjectID) (*models.Monitor, error)
 	ListMonitorsByTargets(ctx context.Context, componentIDs []primitive.ObjectID, subComponentIDs []primitive.ObjectID) ([]models.Monitor, error)
 	ListMonitorsByServiceID(ctx context.Context, serviceID primitive.ObjectID) ([]models.Monitor, error)
 	ListMonitorLogsByMonitorIDsSince(ctx context.Context, monitorIDs []primitive.ObjectID, since time.Time) ([]models.MonitorLog, error)
@@ -180,6 +181,23 @@ func (r *MongoStatusRepository) ListMonitorsByTargets(ctx context.Context, compo
 func (r *MongoStatusRepository) FindMonitorByID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error) {
 	var monitor models.Monitor
 	err := r.db.Collection("monitors").FindOne(ctx, bson.M{"_id": id}).Decode(&monitor)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &monitor, nil
+}
+
+func (r *MongoStatusRepository) FindMonitorBySubComponentID(ctx context.Context, subComponentID primitive.ObjectID) (*models.Monitor, error) {
+	var monitor models.Monitor
+
+	err := r.db.Collection("monitors").
+		FindOne(ctx, bson.M{"subComponentId": subComponentID}).
+		Decode(&monitor)
+
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
