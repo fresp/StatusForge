@@ -328,7 +328,7 @@ export default function StatusPage() {
           ))}
         </div>
       </main>
-      <Footer centerText={settings.footer.text} />
+      <Footer centerText={settingsData?.footer?.text} showPoweredBy={settingsData?.footer?.showPoweredBy} />
     </div>
   )
 }
