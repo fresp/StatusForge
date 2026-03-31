@@ -29,6 +29,7 @@ type CreateInput struct {
 }
 
 type UpdateInput struct {
+	ComponentID string
 	Name        string
 	Description string
 	Status      models.ComponentStatus
@@ -77,7 +78,26 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (models.SubComp
 }
 
 func (s *Service) Update(ctx context.Context, id primitive.ObjectID, input UpdateInput) (models.SubComponent, error) {
+	if input.ComponentID != "" {
+		componentID, err := primitive.ObjectIDFromHex(input.ComponentID)
+		if err != nil {
+			return models.SubComponent{}, fmt.Errorf("%w: invalid componentId", shared.ErrInvalidInput)
+		}
+
+		exists, err := s.repo.ComponentExists(ctx, componentID)
+		if err != nil {
+			return models.SubComponent{}, err
+		}
+		if !exists {
+			return models.SubComponent{}, fmt.Errorf("%w: component not found", shared.ErrInvalidInput)
+		}
+	}
+
 	setFields := bson.M{}
+	if input.ComponentID != "" {
+		componentID, _ := primitive.ObjectIDFromHex(input.ComponentID)
+		setFields["componentId"] = componentID
+	}
 	if input.Name != "" {
 		setFields["name"] = input.Name
 	}
@@ -98,4 +118,28 @@ func (s *Service) Update(ctx context.Context, id primitive.ObjectID, input Updat
 	}
 
 	return sub, nil
+}
+
+func (s *Service) Delete(ctx context.Context, id primitive.ObjectID) error {
+	sub, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return fmt.Errorf("%w: subcomponent not found", shared.ErrNotFound)
+		}
+		return err
+	}
+
+	if err := s.repo.CleanupReferencesForDeletedSubComponent(ctx, id, sub.ComponentID); err != nil {
+		return err
+	}
+
+	deleted, err := s.repo.DeleteByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if deleted == 0 {
+		return fmt.Errorf("%w: subcomponent not found", shared.ErrNotFound)
+	}
+
+	return nil
 }

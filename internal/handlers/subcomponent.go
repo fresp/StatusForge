@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -107,6 +108,7 @@ func UpdateSubComponent(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		var req struct {
+			ComponentID string                 `json:"componentId"`
 			Name        string                 `json:"name"`
 			Description string                 `json:"description"`
 			Status      models.ComponentStatus `json:"status"`
@@ -116,11 +118,14 @@ func UpdateSubComponent(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
+		log.Printf("[SUBCOMPONENT_HANDLER] update payload id=%s componentId=%q name=%q status=%q", id.Hex(), req.ComponentID, req.Name, req.Status)
+
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		service := subcomponentservice.NewService(repository.NewMongoSubComponentRepository(db))
 		sub, err := service.Update(ctx, id, subcomponentservice.UpdateInput{
+			ComponentID: req.ComponentID,
 			Name:        req.Name,
 			Description: req.Description,
 			Status:      req.Status,
@@ -131,5 +136,26 @@ func UpdateSubComponent(db *mongo.Database) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, sub)
+	}
+}
+
+func DeleteSubComponent(db *mongo.Database) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := primitive.ObjectIDFromHex(c.Param("id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		service := subcomponentservice.NewService(repository.NewMongoSubComponentRepository(db))
+		if err := service.Delete(ctx, id); err != nil {
+			writeDomainError(c, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 	}
 }

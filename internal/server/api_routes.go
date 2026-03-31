@@ -88,6 +88,7 @@ func RegisterAPIRoutes(r *gin.Engine, hub *handlers.Hub, cfg *configs.Config) {
 
 	adminOnly.POST("/subcomponents", handlers.CreateSubComponent(database.GetDB()))
 	adminOnly.PATCH("/subcomponents/:id", handlers.UpdateSubComponent(database.GetDB()))
+	adminOnly.DELETE("/subcomponents/:id", handlers.DeleteSubComponent(database.GetDB()))
 
 	adminOnly.GET("/monitors", handlers.GetMonitors(database.GetDB()))
 	adminOnly.POST("/monitors", handlers.CreateMonitor(database.GetDB()))
