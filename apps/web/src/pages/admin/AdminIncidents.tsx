@@ -7,6 +7,7 @@ import type { Incident, IncidentUpdate, Component, IncidentStatus, IncidentImpac
 import { INCIDENT_STATUS_LABELS, INCIDENT_IMPACT_LABELS, formatDate } from '../../lib/utils'
 import Modal from '../../components/Modal'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import { AdminListCard, AdminTableEmptyRow, textOrEmDash } from '../../components/AdminTableShell'
 
 const STATUSES: IncidentStatus[] = ['investigating', 'identified', 'monitoring', 'resolved']
 const IMPACTS: IncidentImpact[] = ['none', 'minor', 'major', 'critical']
@@ -95,7 +96,7 @@ function IncidentRow({ incident, components, onRefetch }: {
           </span>
         </td>
         <td className="px-6 py-4 text-sm text-gray-500">{formatDate(incident.createdAt)}</td>
-        <td className="px-6 py-4 text-sm text-gray-500">{incident.creatorUsername || '—'}</td>
+         <td className="px-6 py-4 text-sm text-gray-500">{textOrEmDash(incident.creatorUsername)}</td>
         <td className="px-6 py-4">
           <div className="flex items-center justify-end gap-2">
             <button
@@ -281,8 +282,8 @@ export default function AdminIncidents() {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+       <AdminListCard>
+         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
               <th className="text-left px-6 py-3 font-medium text-gray-600">Title</th>
@@ -297,11 +298,11 @@ export default function AdminIncidents() {
             {filtered.map(inc => (
               <IncidentRow key={inc.id} incident={inc} components={components || []} onRefetch={refetch} />
             ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-400">No incidents found.</td>
-              </tr>
-            )}
+             {filtered.length === 0 && (
+               <AdminTableEmptyRow colSpan={6}>
+                 No incidents found.
+               </AdminTableEmptyRow>
+             )}
           </tbody>
         </table>
 
@@ -312,9 +313,9 @@ export default function AdminIncidents() {
           limit={limit}
           loading={loading}
           onPageChange={setPage}
-          onLimitChange={setLimit}
-        />
-      </div>
+           onLimitChange={setLimit}
+         />
+       </AdminListCard>
 
       {showModal && (
         <Modal title="Create Incident" onClose={() => setShowModal(false)} size="lg">

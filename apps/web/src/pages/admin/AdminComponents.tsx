@@ -7,6 +7,7 @@ import type { Component, ComponentStatus } from '../../types'
 import { STATUS_LABELS, STATUS_COLORS } from '../../lib/utils'
 import Modal from '../../components/Modal'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import { AdminListCard, AdminTableEmptyRow, textOrEmDash } from '../../components/AdminTableShell'
 
 const STATUSES: ComponentStatus[] = ['operational', 'degraded_performance', 'partial_outage', 'major_outage', 'maintenance']
 
@@ -90,7 +91,7 @@ export default function AdminComponents() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <AdminListCard>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -103,8 +104,8 @@ export default function AdminComponents() {
           <tbody className="divide-y divide-gray-50">
             {(components || []).map(c => (
               <tr key={c.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium text-gray-900">{c.name}</td>
-                <td className="px-6 py-4 text-gray-500">{c.description || '—'}</td>
+                 <td className="px-6 py-4 font-medium text-gray-900">{c.name}</td>
+                 <td className="px-6 py-4 text-gray-500">{textOrEmDash(c.description)}</td>
                 <td className="px-6 py-4">
                   <span className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${STATUS_COLORS[c.status]}`} />
@@ -123,11 +124,11 @@ export default function AdminComponents() {
                 </td>
               </tr>
             ))}
-            {(components || []).length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-gray-400">No components yet. Create one to get started.</td>
-              </tr>
-            )}
+             {(components || []).length === 0 && (
+               <AdminTableEmptyRow colSpan={4}>
+                 No components yet. Create one to get started.
+               </AdminTableEmptyRow>
+             )}
           </tbody>
         </table>
 
@@ -138,9 +139,9 @@ export default function AdminComponents() {
           limit={limit}
           loading={loading}
           onPageChange={setPage}
-          onLimitChange={setLimit}
-        />
-      </div>
+           onLimitChange={setLimit}
+         />
+       </AdminListCard>
 
       {showModal && (
         <Modal title={editing ? 'Edit Component' : 'New Component'} onClose={closeModal}>

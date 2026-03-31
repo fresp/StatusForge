@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
 import { useAdminPagination } from '../../hooks/useAdminPagination'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import { AdminListCard, AdminListStateMessage } from '../../components/AdminTableShell'
 import type { Monitor, MonitorLog } from '../../types'
 import { formatDate } from '../../lib/utils'
 
@@ -72,13 +73,17 @@ export default function AdminMonitorLogs() {
         </Link>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <AdminListCard>
         {loading && (
-          <div className="px-6 py-8 text-sm text-gray-500">Loading logs...</div>
+          <AdminListStateMessage>
+            Loading logs...
+          </AdminListStateMessage>
         )}
 
         {!loading && error && (
-          <div className="px-6 py-8 text-sm text-red-600">Failed to load logs.</div>
+          <AdminListStateMessage tone="error">
+            Failed to load logs.
+          </AdminListStateMessage>
         )}
 
         {!loading && !error && (logs || []).length === 0 && (
@@ -139,7 +144,7 @@ export default function AdminMonitorLogs() {
             />
           </>
         )}
-      </div>
+      </AdminListCard>
     </div>
   )
 }

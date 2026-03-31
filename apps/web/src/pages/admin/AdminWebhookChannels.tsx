@@ -6,6 +6,7 @@ import api from '../../lib/api'
 import type { WebhookChannel } from '../../types'
 import { formatDate } from '../../lib/utils'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import { AdminListCard, AdminTableEmptyRow } from '../../components/AdminTableShell'
 
 export default function AdminWebhookChannels() {
   const { page, limit, apiParams, setPage, setLimit } = useAdminPagination()
@@ -89,7 +90,7 @@ export default function AdminWebhookChannels() {
         {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <AdminListCard>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -135,13 +136,11 @@ export default function AdminWebhookChannels() {
                 </td>
               </tr>
             ))}
-            {(channels || []).length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
-                  No webhook channels configured. Add your first webhook above.
-                </td>
-              </tr>
-            )}
+             {(channels || []).length === 0 && (
+               <AdminTableEmptyRow colSpan={5}>
+                 No webhook channels configured. Add your first webhook above.
+               </AdminTableEmptyRow>
+             )}
           </tbody>
         </table>
 
@@ -152,9 +151,9 @@ export default function AdminWebhookChannels() {
           limit={limit}
           loading={loading}
           onPageChange={setPage}
-          onLimitChange={setLimit}
-        />
-      </div>
+           onLimitChange={setLimit}
+         />
+       </AdminListCard>
     </div>
   )
 }

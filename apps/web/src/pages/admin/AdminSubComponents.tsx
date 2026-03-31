@@ -7,6 +7,7 @@ import type { SubComponent, Component, ComponentStatus } from '../../types'
 import { STATUS_LABELS, STATUS_COLORS } from '../../lib/utils'
 import Modal from '../../components/Modal'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import { AdminListCard, AdminTableEmptyRow } from '../../components/AdminTableShell'
 
 const STATUSES: ComponentStatus[] = ['operational', 'degraded_performance', 'partial_outage', 'major_outage', 'maintenance']
 
@@ -105,7 +106,7 @@ export default function AdminSubComponents() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <AdminListCard>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -135,11 +136,11 @@ export default function AdminSubComponents() {
                 </td>
               </tr>
             ))}
-            {(subComponents || []).length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-gray-400">No sub-components yet.</td>
-              </tr>
-            )}
+             {(subComponents || []).length === 0 && (
+               <AdminTableEmptyRow colSpan={4}>
+                 No sub-components yet.
+               </AdminTableEmptyRow>
+             )}
           </tbody>
         </table>
 
@@ -150,9 +151,9 @@ export default function AdminSubComponents() {
           limit={limit}
           loading={loading}
           onPageChange={setPage}
-          onLimitChange={setLimit}
-        />
-      </div>
+           onLimitChange={setLimit}
+         />
+       </AdminListCard>
 
       {showModal && (
         <Modal title={editing ? 'Edit Sub-Component' : 'New Sub-Component'} onClose={closeModal}>

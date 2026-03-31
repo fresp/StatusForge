@@ -6,6 +6,7 @@ import api from '../../lib/api'
 import type { Subscriber } from '../../types'
 import { formatDate } from '../../lib/utils'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import { AdminListCard, AdminTableEmptyRow } from '../../components/AdminTableShell'
 
 export default function AdminSubscribers() {
   const { page, limit, apiParams, setPage, setLimit } = useAdminPagination()
@@ -39,7 +40,7 @@ export default function AdminSubscribers() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <AdminListCard>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -81,13 +82,11 @@ export default function AdminSubscribers() {
                 </td>
               </tr>
             ))}
-            {(subscribers || []).length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-gray-400">
-                  No subscribers yet. Subscribers sign up from the public status page.
-                </td>
-              </tr>
-            )}
+             {(subscribers || []).length === 0 && (
+               <AdminTableEmptyRow colSpan={4}>
+                 No subscribers yet. Subscribers sign up from the public status page.
+               </AdminTableEmptyRow>
+             )}
           </tbody>
         </table>
 
@@ -98,9 +97,9 @@ export default function AdminSubscribers() {
           limit={limit}
           loading={loading}
           onPageChange={setPage}
-          onLimitChange={setLimit}
-        />
-      </div>
+           onLimitChange={setLimit}
+         />
+       </AdminListCard>
     </div>
   )
 }

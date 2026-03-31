@@ -7,6 +7,7 @@ import api from '../../lib/api'
 import type { Monitor, Component, SubComponent, MonitorType } from '../../types'
 import Modal from '../../components/Modal'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import { AdminListCard, AdminTableEmptyRow } from '../../components/AdminTableShell'
 
 const MONITOR_TYPES: MonitorType[] = ['http', 'tcp', 'dns', 'ping', 'ssl']
 
@@ -210,8 +211,8 @@ export default function AdminMonitors() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
+       <AdminListCard>
+         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
               <th className="text-left px-6 py-3 font-medium text-gray-600">Name</th>
@@ -282,11 +283,11 @@ export default function AdminMonitors() {
                 </td>
               </tr>
             ))}
-            {(monitors || []).length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-400">No monitors configured. Add one to start tracking uptime.</td>
-              </tr>
-            )}
+             {(monitors || []).length === 0 && (
+               <AdminTableEmptyRow colSpan={7}>
+                 No monitors configured. Add one to start tracking uptime.
+               </AdminTableEmptyRow>
+             )}
           </tbody>
         </table>
 
@@ -297,9 +298,9 @@ export default function AdminMonitors() {
           limit={limit}
           loading={monitorsLoading}
           onPageChange={setPage}
-          onLimitChange={setLimit}
-        />
-      </div>
+           onLimitChange={setLimit}
+         />
+       </AdminListCard>
 
       {showModal && (
         <Modal

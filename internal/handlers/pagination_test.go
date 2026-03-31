@@ -99,3 +99,67 @@ func TestClampPageToTotalPagesNormalizesPageBelowOne(t *testing.T) {
 
 	assert.Equal(t, 1, clamped)
 }
+
+func TestParsePaginationParamsWithDefaultConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
+	c.Request = req
+
+	page, limit, err := ParsePaginationParams(c, DefaultPaginationConfig())
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, page)
+	assert.Equal(t, 20, limit)
+}
+
+func TestParsePaginationParamsWithMonitorLogsConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
+	c.Request = req
+
+	page, limit, err := ParsePaginationParams(c, MonitorLogsPaginationConfig())
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, page)
+	assert.Equal(t, 10, limit)
+}
+
+func TestParsePaginationParamsWithCustomMaxLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/api/test?limit=500", nil)
+	c.Request = req
+
+	config := PaginationConfig{
+		DefaultLimit: 20,
+		MaxLimit:     100,
+	}
+	page, limit, err := ParsePaginationParams(c, config)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, page)
+	assert.Equal(t, 100, limit)
+}
+
+func TestParsePaginationParamsWithNoMaxLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodGet, "/api/test?limit=500", nil)
+	c.Request = req
+
+	config := PaginationConfig{
+		DefaultLimit: 20,
+		MaxLimit:     0,
+	}
+	page, limit, err := ParsePaginationParams(c, config)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, page)
+	assert.Equal(t, 500, limit)
+}
