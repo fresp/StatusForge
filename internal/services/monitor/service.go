@@ -85,6 +85,28 @@ func (s *Service) Logs(ctx context.Context, monitorID primitive.ObjectID, limit 
 	return s.repo.ListLogs(ctx, monitorID, limit)
 }
 
+func (s *Service) GetMonitorLogsPaginated(ctx context.Context, monitorID primitive.ObjectID, page, limit int) (models.PaginatedResult[models.MonitorLog], error) {
+	logs, total, err := s.repo.FindLogsByMonitorIDPaginated(ctx, monitorID, page, limit)
+	if err != nil {
+		return models.PaginatedResult[models.MonitorLog]{}, err
+	}
+
+	return models.PaginatedResult[models.MonitorLog]{
+		Items:      logs,
+		Page:       page,
+		Total:      total,
+		TotalPages: calculateTotalPages(total, limit),
+	}, nil
+}
+
+func calculateTotalPages(total int64, limit int) int {
+	if total <= 0 || limit <= 0 {
+		return 0
+	}
+
+	return int((total + int64(limit) - 1) / int64(limit))
+}
+
 func (s *Service) Uptime(ctx context.Context, monitorID primitive.ObjectID, since time.Time) ([]models.DailyUptime, error) {
 	return s.repo.ListUptime(ctx, monitorID, since)
 }

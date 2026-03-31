@@ -1,6 +1,8 @@
 import React from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi'
+import { useAdminPagination } from '../../hooks/useAdminPagination'
+import AdminPaginationControls from '../../components/AdminPaginationControls'
 import type { Monitor, MonitorLog } from '../../types'
 import { formatDate } from '../../lib/utils'
 
@@ -24,6 +26,7 @@ export function latencyBarWidth(responseTime: number): number {
 
 export default function AdminMonitorLogs() {
   const { id } = useParams<{ id: string }>()
+  const { page, limit, apiParams, setPage, setLimit } = useAdminPagination()
 
   const {
     data: monitors,
@@ -32,9 +35,11 @@ export default function AdminMonitorLogs() {
 
   const {
     data: logs,
+    total,
+    totalPages,
     loading,
     error,
-  } = useApi<MonitorLog[]>(`/monitors/${id}/logs`, [id])
+  } = useApi<MonitorLog[]>(`/monitors/${id}/logs`, [id], apiParams)
 
   const monitor = (monitors || []).find((item) => item.id === id)
 
@@ -83,44 +88,56 @@ export default function AdminMonitorLogs() {
         )}
 
         {!loading && !error && (logs || []).length > 0 && (
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left font-medium text-gray-600">Status</th>
-                <th className="px-6 py-3 text-left font-medium text-gray-600">Latency</th>
-                <th className="px-6 py-3 text-left font-medium text-gray-600">Status Code</th>
-                <th className="px-6 py-3 text-left font-medium text-gray-600">Region</th>
-                <th className="px-6 py-3 text-left font-medium text-gray-600">Checked At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {(logs || []).map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(log.status)}`}
-                    >
-                      {log.status.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <span className="w-20 text-xs text-gray-700">{log.responseTime}ms</span>
-                      <div className="h-2 w-32 rounded bg-gray-100">
-                        <div
-                          className="h-2 rounded bg-blue-500"
-                          style={{ width: `${latencyBarWidth(log.responseTime)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-gray-700">{log.statusCode || '-'}</td>
-                  <td className="px-6 py-4 text-gray-500">{log.region || 'global'}</td>
-                  <td className="px-6 py-4 text-gray-500">{formatDate(log.checkedAt)}</td>
+          <>
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-100 bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left font-medium text-gray-600">Status</th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-600">Latency</th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-600">Status Code</th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-600">Region</th>
+                  <th className="px-6 py-3 text-left font-medium text-gray-600">Checked At</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {(logs || []).map((log) => (
+                  <tr key={log.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(log.status)}`}
+                      >
+                        {log.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="w-20 text-xs text-gray-700">{log.responseTime}ms</span>
+                        <div className="h-2 w-32 rounded bg-gray-100">
+                          <div
+                            className="h-2 rounded bg-blue-500"
+                            style={{ width: `${latencyBarWidth(log.responseTime)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">{log.statusCode || '-'}</td>
+                    <td className="px-6 py-4 text-gray-500">{log.region || 'global'}</td>
+                    <td className="px-6 py-4 text-gray-500">{formatDate(log.checkedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <AdminPaginationControls
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={limit}
+              loading={loading}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
+          </>
         )}
       </div>
     </div>

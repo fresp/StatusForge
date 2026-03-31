@@ -26,6 +26,10 @@ type monitorLookup interface {
 	FindMonitorBySubComponentID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error)
 }
 
+type monitorLogsService interface {
+	GetMonitorLogsPaginated(ctx context.Context, monitorID primitive.ObjectID, page, limit int) (models.PaginatedResult[models.MonitorLog], error)
+}
+
 func GetMonitors(db *mongo.Database) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		page, limit, err := parsePaginationParams(c)
@@ -269,6 +273,11 @@ func TestMonitor() gin.HandlerFunc {
 }
 
 func GetMonitorLogs(db *mongo.Database) gin.HandlerFunc {
+	service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
+	return getMonitorLogsWithService(service)
+}
+
+func getMonitorLogsWithService(service monitorLogsService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		monitorID, err := primitive.ObjectIDFromHex(c.Param("id"))
 		if err != nil {
@@ -276,11 +285,16 @@ func GetMonitorLogs(db *mongo.Database) gin.HandlerFunc {
 			return
 		}
 
+		page, limit, err := parseMonitorLogsPaginationParams(c)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		service := monitorservice.NewService(repository.NewMongoMonitorRepository(db))
-		logs, err := service.Logs(ctx, monitorID, 100)
+		logs, err := service.GetMonitorLogsPaginated(ctx, monitorID, page, limit)
 		if err != nil {
 			writeDomainError(c, err)
 			return

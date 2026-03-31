@@ -49,6 +49,10 @@ func (s *stubMonitorLookup) FindMonitorByID(_ context.Context, id primitive.Obje
 	return &models.Monitor{ComponentID: s.monitor.ComponentID, SubComponentID: s.monitor.SubComponentID}, nil
 }
 
+func (s *stubMonitorLookup) FindMonitorBySubComponentID(ctx context.Context, id primitive.ObjectID) (*models.Monitor, error) {
+	return s.FindMonitorByID(ctx, id)
+}
+
 func (s *stubMonitorMetricsBuilder) BuildServiceMetrics(_ context.Context, serviceID primitive.ObjectID, now time.Time) (*statusservice.ServiceMetrics, error) {
 	s.called = true
 	s.id = serviceID

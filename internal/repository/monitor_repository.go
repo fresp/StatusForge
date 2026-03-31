@@ -20,6 +20,7 @@ type MonitorRepository interface {
 	Delete(ctx context.Context, id primitive.ObjectID) (bool, error)
 	List(ctx context.Context, page, limit int) ([]models.Monitor, int64, error)
 	ListLogs(ctx context.Context, monitorID primitive.ObjectID, limit int64) ([]models.MonitorLog, error)
+	FindLogsByMonitorIDPaginated(ctx context.Context, monitorID primitive.ObjectID, page, limit int) ([]models.MonitorLog, int64, error)
 	ListUptime(ctx context.Context, monitorID primitive.ObjectID, since time.Time) ([]models.DailyUptime, error)
 	ListOutages(ctx context.Context) ([]models.Outage, error)
 	ListHistory(ctx context.Context, monitorID primitive.ObjectID, limit int64) ([]models.EnhancedMonitorLog, error)
@@ -135,6 +136,42 @@ func (r *MongoMonitorRepository) ListLogs(ctx context.Context, monitorID primiti
 	}
 
 	return logs, nil
+}
+
+func (r *MongoMonitorRepository) FindLogsByMonitorIDPaginated(ctx context.Context, monitorID primitive.ObjectID, page, limit int) ([]models.MonitorLog, int64, error) {
+	collection := r.collection.Database().Collection("monitor_logs")
+	filter, findOptions := buildMonitorLogsPaginationQuery(monitorID, page, limit)
+
+	total, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	cursor, err := collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var logs []models.MonitorLog
+	if err := cursor.All(ctx, &logs); err != nil {
+		return nil, 0, err
+	}
+	if logs == nil {
+		logs = []models.MonitorLog{}
+	}
+
+	return logs, total, nil
+}
+
+func buildMonitorLogsPaginationQuery(monitorID primitive.ObjectID, page, limit int) (bson.M, *options.FindOptions) {
+	filter := bson.M{"monitorId": monitorID}
+	findOptions := options.Find().
+		SetSort(bson.D{{Key: "checkedAt", Value: -1}}).
+		SetSkip(int64((page - 1) * limit)).
+		SetLimit(int64(limit))
+
+	return filter, findOptions
 }
 
 func (r *MongoMonitorRepository) ListUptime(ctx context.Context, monitorID primitive.ObjectID, since time.Time) ([]models.DailyUptime, error) {

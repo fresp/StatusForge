@@ -8,6 +8,21 @@ vi.mock('../../hooks/useApi', () => ({
   useApi: vi.fn(),
 }))
 
+vi.mock('../../hooks/useAdminPagination', () => ({
+  useAdminPagination: vi.fn(),
+}))
+
+vi.mock('../../components/AdminPaginationControls', () => ({
+  default: ({ page, limit, totalPages, total }: { page: number; limit: number; totalPages: number; total: number }) =>
+    React.createElement('div', {
+      'data-testid': 'pagination-controls',
+      'data-page': String(page),
+      'data-limit': String(limit),
+      'data-total-pages': String(totalPages),
+      'data-total': String(total),
+    }),
+}))
+
 vi.mock('react-router-dom', () => ({
   Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) =>
     React.createElement('a', { href: to, ...props }, children),
@@ -15,6 +30,7 @@ vi.mock('react-router-dom', () => ({
 }))
 
 import { useApi } from '../../hooks/useApi'
+import { useAdminPagination } from '../../hooks/useAdminPagination'
 import { useParams } from 'react-router-dom'
 import AdminMonitorLogs from './AdminMonitorLogs'
 
@@ -61,11 +77,42 @@ const LOG: MonitorLog = {
 
 describe('AdminMonitorLogs states', () => {
   const mockedUseApi = vi.mocked(useApi)
+  const mockedUseAdminPagination = vi.mocked(useAdminPagination)
   const mockedUseParams = vi.mocked(useParams)
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockedUseParams.mockReturnValue({ id: 'm1' })
+    mockedUseAdminPagination.mockReturnValue({
+      page: 2,
+      limit: 20,
+      apiParams: { page: 2, limit: 20 },
+      setPage: vi.fn(),
+      setLimit: vi.fn(),
+    })
+  })
+
+  it('requests logs using pagination query params and renders controls', () => {
+    mockedUseApi.mockImplementation((url: string) => {
+      if (url === '/monitors') {
+        return makeApiResult<Monitor[]>([MONITOR], false)
+      }
+      return {
+        ...makeApiResult<MonitorLog[]>([LOG], false),
+        total: 52,
+        page: 2,
+        totalPages: 3,
+      }
+    })
+
+    const html = renderToStaticMarkup(<AdminMonitorLogs />)
+
+    expect(mockedUseApi).toHaveBeenCalledWith('/monitors/m1/logs', ['m1'], { page: 2, limit: 20 })
+    expect(html).toContain('data-testid="pagination-controls"')
+    expect(html).toContain('data-page="2"')
+    expect(html).toContain('data-limit="20"')
+    expect(html).toContain('data-total-pages="3"')
+    expect(html).toContain('data-total="52"')
   })
 
   it('renders loading state for logs', () => {
