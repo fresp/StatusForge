@@ -1,136 +1,83 @@
 # StatusForge
 
-StatusForge is a self-hosted status page and infrastructure monitoring platform. It combines a Go (Gin) API server, an embedded React frontend, a worker loop for active checks, and a public status page with real-time updates.
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![License](https://img.shields.io/github/license/fresp/StatusForge)
+![Last Commit](https://img.shields.io/github/last-commit/fresp/StatusForge)
 
-## Table of Contents
+StatusForge is a self-hosted status page and uptime monitoring platform.
 
-- [Overview](#overview)
-- [Features](#features)
-- [Screenshots](#screenshots)
-- [Architecture Diagram](#architecture-diagram)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Setup](#setup)
-- [Configuration](#configuration)
-- [Monitoring and Worker Model](#monitoring-and-worker-model)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
+It helps you monitor services, publish incidents, schedule maintenance, and share real-time status updates from one place.
 
 ## Overview
 
-StatusForge is designed for teams that want to run their own status platform and keep control of runtime, data, and integrations. The server exposes API routes and WebSocket events, serves an embedded SPA build, seeds an initial admin user from environment variables, and can run a background monitor worker in-process.
+StatusForge is built for teams that want a simple way to communicate service health without giving up control of their own infrastructure.
 
-## Features
+With StatusForge, you can:
 
-- Public status page with component and subcomponent health
-- Incident lifecycle management with incident updates
-- Scheduled and active maintenance publishing
-- Active monitor checks (HTTP, TCP, DNS, Ping, SSL)
-- SSL certificate and domain expiry warning support in monitor flow
-- Role-aware admin area (`admin`, `operator`) with MFA-gated routes
-- JWT-authenticated API for protected operations
-- WebSocket push events for near real-time UI refresh
-- Subscriber management and webhook channel management
-- Status page branding and settings management
+- Show a clean public status page for your services
+- Track incidents and post updates as things happen
+- Schedule planned maintenance ahead of time
+- Monitor endpoints and infrastructure from one dashboard
+- Manage everything from a dedicated admin area
+- Self-host the platform in your own environment
+
+## Feature Highlights
+
+### Public Status Experience
+- Public-facing status page for services, components, and subcomponents
+- Incident history for transparent communication over time
+- Service detail views with uptime and status context
+- Real-time updates for a more responsive status experience
+
+### Incident & Maintenance Management
+- Create, update, and resolve incidents from the admin area
+- Publish scheduled maintenance to prepare users in advance
+- Keep status communication centralized and consistent
+
+### Monitoring & Reliability
+- Built-in active monitoring for HTTP, TCP, DNS, Ping, and SSL checks
+- Warning support for SSL and domain expiry monitoring flows
+- Worker-driven status updates tied to monitoring results
+
+### Administration & Access Control
+- Dedicated admin dashboard for operational management
+- Role-aware access for `admin` and `operator`
+- MFA-aware protected flows for sensitive actions
+- Centralized settings for branding and platform behavior
+
+### Realtime & Integrations
+- WebSocket-powered live refresh for key status updates
+- Webhook channel management
+- Subscriber management for status communication workflows
 
 ## Screenshots
 
-StatusForge includes documentation images under `docs/screenshots/`.
+### Public Experience
 
-## 🌐 Public Pages
-
-| Public Status Page | Incident History | Service Info |
+| Status Page | Incident History | Service Details |
 |---|---|---|
 | ![Public Status Page](docs/screenshots/public-statuspage.png) | ![Incident History](docs/screenshots/incident-history.png) | ![Service Info](docs/screenshots/public-service-info.png) |
 
-**Description:**
-- **Public Status Page** → Overview of service status
-- **Incident History** → Historical incidents and outages
-- **Service Info** → Detailed service information (uptime, latency, etc.)
+### Admin Experience
 
----
-
-## 🔐 Admin Pages
-
-| Admin Dashboard | Admin Settings | Admin Monitoring | Admin Maintenance |
+| Dashboard | Monitoring | Maintenance | Settings |
 |---|---|---|---|
-| ![Admin Dashboard](docs/screenshots/admin-dashboard.png) | ![Admin Setting](docs/screenshots/admin-settings.png) | ![Monitoring](docs/screenshots/admin-monitoring.png) | ![Maintenance](docs/screenshots/admin-maintenance.png) |
+| ![Admin Dashboard](docs/screenshots/admin-dashboard.png) | ![Admin Monitoring](docs/screenshots/admin-monitoring.png) | ![Admin Maintenance](docs/screenshots/admin-maintenance.png) | ![Admin Settings](docs/screenshots/admin-settings.png) |
 
-**Description:**
-- **Admin Dashboard** → System overview and summary
-- **Admin Settings** → Global configuration
-- **Admin Monitoring** → Monitoring setup and control
-- **Admin Maintenance** → Maintenance scheduling and management
+## What You Can Do
 
-## Architecture Diagram
+- Run a public-facing status page
+- Manage incidents and maintenance in one place
+- Monitor services with active checks
+- Keep internal operators and external users aligned
+- Self-host your uptime and status workflow
 
-```mermaid
-flowchart LR
-  Browser[Browser\nPublic + Admin SPA] -->|HTTP/JSON| Gin[Go Gin Server]
-  Browser -->|WebSocket /ws| WS[WebSocket Hub]
+## Quick Start
 
-  Gin --> Routes[API Routes\ninternal/server/api_routes.go]
-  Routes --> Handlers[Handlers]
-  Handlers --> Services[Services]
-  Services --> Repos[Repositories]
+The fastest way to run StatusForge locally is with Docker Compose.
 
-  Repos --> Mongo[(MongoDB)]
-  Services --> Redis[(Redis)]
-
-  Gin --> Static[Embedded static files\ninternal/embed/dist]
-
-  Worker[In-process Worker\ninternal/server/worker.go] --> Mongo
-  Worker --> Utils[Monitor check utils]
-  Worker --> WS
-```
-
-Detailed architecture documentation is available at [`docs/architecture.md`](docs/architecture.md).
-
-## Tech Stack
-
-- **Backend language/runtime**: Go 1.26
-- **HTTP framework**: Gin
-- **Auth tokens**: JWT (`github.com/golang-jwt/jwt/v5`)
-- **Realtime**: Gorilla WebSocket
-- **Primary database**: MongoDB
-- **Cache / auxiliary store**: Redis
-- **Frontend**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS
-- **Containerization**: Docker multi-stage build + Docker Compose
-
-## Project Structure
-
-```text
-.
-├── cmd/server/main.go                 # Process entrypoint
-├── internal/server/                   # Server bootstrap, routes, worker, static serving
-├── internal/handlers/                 # HTTP + websocket handlers
-├── internal/services/                 # Application service layer
-├── internal/repository/               # Data access layer
-├── internal/database/                 # MongoDB/Redis connection setup
-├── internal/middleware/               # JWT, MFA, role middleware
-├── internal/models/                   # Domain and persistence models
-├── internal/embed/                    # Embedded frontend assets (dist)
-├── apps/web/                          # React SPA source
-├── configs/config.go                  # Environment-driven config loader
-├── Dockerfile                         # Multi-stage frontend+backend build
-├── docker-compose.yml                 # Server + Mongo + Redis stack
-└── docs/                              # Architecture and image docs
-```
-
-## Setup
-
-### Prerequisites
-
-- Docker + Docker Compose (recommended path)
-- Or for local non-container execution:
-  - Go 1.26+
-  - Node.js 20+
-  - MongoDB
-  - Redis
-
-### Quick Start (Docker Compose)
+### Run with Docker Compose
 
 ```bash
 git clone https://github.com/fresp/StatusForge.git
@@ -139,121 +86,48 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Application endpoints:
+### Default Local Endpoints
 
 - Public status page: `http://localhost:8080/`
-- Admin app: `http://localhost:8080/admin`
-- Health check: `http://localhost:8080/health`
-- WebSocket endpoint: `ws://localhost:8080/ws`
+- Admin area: `http://localhost:8080/admin`
+- Health endpoint: `http://localhost:8080/health`
 
-Default bootstrap admin values come from `.env.example`:
+### Default Bootstrap Admin
+
+Values come from `.env.example`:
 
 - `ADMIN_EMAIL=admin@statusplatform.com`
 - `ADMIN_USERNAME=admin`
 - `ADMIN_PASSWORD=admin123`
 
-Change these immediately in any persistent/shared environment.
+Change these immediately for any shared or persistent environment.
 
-### Local Development (without Docker)
+## Tech Stack
 
-Backend:
+- **Backend:** Go, Gin
+- **Frontend:** React, TypeScript, Vite
+- **Database:** MongoDB
+- **Cache / supporting store:** Redis
+- **Realtime:** Gorilla WebSocket
+- **Authentication:** JWT with MFA-aware access flow
+- **Deployment:** Docker, Docker Compose
 
-```bash
-cp .env.example .env
-go mod download
-go run cmd/server/main.go
-```
+## Self-Hosted by Design
 
-Frontend (optional separate dev server):
-
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-
-The production-like server path serves embedded frontend assets via `NoRoute` static fallback; the separate Vite server is mainly for frontend iteration.
-
-### Build Commands
-
-Frontend build:
-
-```bash
-cd apps/web
-npm run build
-```
-
-Backend build:
-
-```bash
-go build -o server cmd/server/main.go
-```
-
-### Makefile Shortcuts
-
-```bash
-make up
-make up-build
-make down
-make logs
-make logs-server
-make ps
-```
-
-## Configuration
-
-Environment variables are loaded via `configs.Load()`.
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `MONGODB_URI` | `mongodb://localhost:27017` | MongoDB connection string |
-| `MONGODB_DB` | `statusplatform` | MongoDB database name |
-| `REDIS_URI` | `localhost:6379` | Redis address |
-| `JWT_SECRET` | `super-secret-jwt-key-change-in-production` | JWT HMAC secret |
-| `MFA_SECRET_KEY` | empty | MFA secret material |
-| `PORT` | `8080` | HTTP listen port |
-| `ADMIN_EMAIL` | `admin@statusplatform.com` | Bootstrap admin email |
-| `ADMIN_PASSWORD` | `admin123` | Bootstrap admin password |
-| `ADMIN_USERNAME` | `admin` | Bootstrap admin username |
-| `ENABLE_WORKER` | `true` | Enable in-process monitor worker |
-| `GRACEFUL_SHUTDOWN` | `true` | Enable signal-based shutdown flow |
-| `SHUTDOWN_TIMEOUT` | `30` | Shutdown timeout in seconds |
-
-## Monitoring and Worker Model
-
-When `ENABLE_WORKER=true`, the server starts an internal monitor worker loop.
-
-- Worker ticker fires every 10 seconds.
-- Effective monitor interval defaults to 60 seconds if not set.
-- Monitor checks supported in current worker code:
-  - HTTP
-  - TCP
-  - DNS
-  - Ping
-  - SSL
-- Check output is written to:
-  - `monitor_logs`
-  - monitor status fields (`lastStatus`, warning fields, `lastCheckedAt`)
-- Worker also triggers:
-  - daily uptime updates
-  - outage detection logic
-  - maintenance status updates
+StatusForge is designed to give teams control over their status workflow, monitoring setup, and public communication without depending on a hosted third-party service.
 
 ## Roadmap
 
-- Harden production WebSocket and CORS policy defaults
-- Expand API reference with OpenAPI/Swagger artifacts
-- Add dedicated worker deployment mode for horizontal scaling
-- Extend observability surface (structured metrics and tracing)
+Planned improvements include:
+
+- stronger production hardening for realtime and CORS behavior
+- richer API and developer documentation
+- more scalable worker deployment patterns
+- broader observability support
 
 ## Contributing
 
-Contributions are welcome.
-
-1. Fork the repository.
-2. Create a feature branch.
-3. Run project checks.
-4. Open a pull request with clear scope and validation notes.
+Contributions are welcome. Open an issue or submit a pull request with a clear scope and validation notes.
 
 ## License
 
