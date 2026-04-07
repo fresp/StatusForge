@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/fresp/StatusForge/internal/models"
-	authservice "github.com/fresp/StatusForge/internal/services/auth"
+	"github.com/fresp/Statora/internal/models"
+	authservice "github.com/fresp/Statora/internal/services/auth"
 )
 
 func TestHandleMFAHandlerErrorReturnsBadRequestForInvalidMFACode(t *testing.T) {
@@ -110,7 +110,7 @@ func TestMFASetupReturnsBootstrapPayload(t *testing.T) {
 
 	svc := &stubMFAHandlerService{startEnrollmentResult: &authservice.StartEnrollmentResult{
 		Secret:        "SECRET123",
-		OTPAuthURL:    "otpauth://totp/StatusForge:alice@example.com?secret=SECRET123",
+		OTPAuthURL:    "otpauth://totp/Statora:alice@example.com?secret=SECRET123",
 		RecoveryCodes: []string{"AAAAA-BBBBB", "CCCCC-DDDDD"},
 	}}
 
@@ -132,7 +132,7 @@ func TestMFASetupReturnsBootstrapPayload(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 	assert.Equal(t, "SECRET123", response["secret"])
-	assert.Equal(t, "otpauth://totp/StatusForge:alice@example.com?secret=SECRET123", response["otpauthUrl"])
+	assert.Equal(t, "otpauth://totp/Statora:alice@example.com?secret=SECRET123", response["otpauthUrl"])
 	assert.Len(t, response["recoveryCodes"], 2)
 }
 

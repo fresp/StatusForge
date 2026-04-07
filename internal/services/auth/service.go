@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/fresp/StatusForge/internal/repository"
+	"github.com/fresp/Statora/internal/repository"
 )
 
 var ErrInvalidCredentials = errors.New("invalid credentials")

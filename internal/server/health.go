@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/fresp/Statora/internal/database"
 	"github.com/gin-gonic/gin"
-	"github.com/fresp/StatusForge/internal/database"
 )
 
 type HealthResponse struct {

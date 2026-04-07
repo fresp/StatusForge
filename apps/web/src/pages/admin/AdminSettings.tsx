@@ -12,14 +12,14 @@ const ADMIN_TITLE_SUFFIX = ' - Admin Panel'
 
 const DEFAULT_SETTINGS: StatusPageSettings = {
   head: {
-    title: 'StatusForge',
+    title: 'Statora',
     description: 'Live system status and incident updates.',
     keywords: 'status, uptime, incidents, maintenance',
     faviconUrl: '/vite.svg',
     metaTags: {},
   },
   branding: {
-    siteName: 'StatusForge',
+    siteName: 'Statora',
     logoUrl: '',
     backgroundImageUrl: '',
     heroImageUrl: '',
@@ -252,7 +252,7 @@ export default function AdminSettings() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Additional Meta Tags</label>
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-[110px]"
-              placeholder={'og:title: My Status Page\nog:site_name: StatusForge'}
+              placeholder={'og:title: My Status Page\nog:site_name: Statora'}
               value={metaTagsText}
               onChange={(e) => setMetaTagsText(e.target.value)}
             />
@@ -332,7 +332,7 @@ export default function AdminSettings() {
               >
                 <div className="flex items-center gap-2">
                   {settings.branding.logoUrl && <img src={settings.branding.logoUrl} alt="logo" className="w-6 h-6 rounded object-contain" />}
-                  <span className="font-semibold">{settings.branding.siteName || 'StatusForge'}</span>
+                  <span className="font-semibold">{settings.branding.siteName || 'Statora'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   <CheckCircle className="w-4 h-4" />

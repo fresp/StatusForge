@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	idsdomain "github.com/fresp/StatusForge/internal/domain/ids"
-	statusdomain "github.com/fresp/StatusForge/internal/domain/status"
-	uptimedomain "github.com/fresp/StatusForge/internal/domain/uptime"
-	"github.com/fresp/StatusForge/internal/models"
-	"github.com/fresp/StatusForge/internal/repository"
+	idsdomain "github.com/fresp/Statora/internal/domain/ids"
+	statusdomain "github.com/fresp/Statora/internal/domain/status"
+	uptimedomain "github.com/fresp/Statora/internal/domain/uptime"
+	"github.com/fresp/Statora/internal/models"
+	"github.com/fresp/Statora/internal/repository"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/fresp/StatusForge/configs"
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/configs"
+	"github.com/fresp/Statora/internal/models"
 )
 
 func TestShouldRunMonitor_FirstRun(t *testing.T) {

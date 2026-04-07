@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	monitordomain "github.com/fresp/StatusForge/internal/domain/monitor"
-	shared "github.com/fresp/StatusForge/internal/domain/shared"
+	monitordomain "github.com/fresp/Statora/internal/domain/monitor"
+	shared "github.com/fresp/Statora/internal/domain/shared"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/fresp/StatusForge/internal/models"
-	"github.com/fresp/StatusForge/internal/repository"
+	"github.com/fresp/Statora/internal/models"
+	"github.com/fresp/Statora/internal/repository"
 )
 
 type ValidationError struct {

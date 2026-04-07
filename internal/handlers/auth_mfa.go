@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/fresp/StatusForge/configs"
-	"github.com/fresp/StatusForge/internal/repository"
-	authservice "github.com/fresp/StatusForge/internal/services/auth"
+	"github.com/fresp/Statora/configs"
+	"github.com/fresp/Statora/internal/repository"
+	authservice "github.com/fresp/Statora/internal/services/auth"
 )
 
 type mfaHandlerService interface {

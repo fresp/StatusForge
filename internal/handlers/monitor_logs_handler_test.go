@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	shared "github.com/fresp/StatusForge/internal/domain/shared"
-	"github.com/fresp/StatusForge/internal/models"
+	shared "github.com/fresp/Statora/internal/domain/shared"
+	"github.com/fresp/Statora/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

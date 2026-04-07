@@ -1,18 +1,18 @@
 import type { StatusPageSettings } from '../types'
 import { loadThemePresetStylesheet, getThemePresets, DEFAULT_THEME_PRESET } from './themePresetLoader'
 
-export const STATUS_PAGE_SETTINGS_CACHE_KEY = 'statusforge:status-page-settings'
+export const STATUS_PAGE_SETTINGS_CACHE_KEY = 'Statora:status-page-settings'
 
 export const DEFAULT_STATUS_PAGE_SETTINGS: StatusPageSettings = {
   head: {
-    title: 'StatusForge',
+    title: 'Statora',
     description: 'Live system status and incident updates.',
     keywords: 'status, uptime, incidents, maintenance',
     faviconUrl: '/vite.svg',
     metaTags: {},
   },
   branding: {
-    siteName: 'StatusForge',
+    siteName: 'Statora',
     logoUrl: '',
     backgroundImageUrl: '',
     heroImageUrl: '',

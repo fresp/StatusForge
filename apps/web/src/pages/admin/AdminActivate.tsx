@@ -4,7 +4,7 @@ import api from '../../lib/api'
 import { useApi } from '../../hooks/useApi'
 import type { StatusPageSettings } from '../../types'
 
-const DEFAULT_PAGE_TITLE = 'StatusForge'
+const DEFAULT_PAGE_TITLE = 'Statora'
 
 export default function AdminActivate() {
   const [searchParams] = useSearchParams()

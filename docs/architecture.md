@@ -1,6 +1,6 @@
-# StatusForge Architecture
+# Statora Architecture
 
-This document describes the current architecture of StatusForge based on the present repository implementation.
+This document describes the current architecture of Statora based on the present repository implementation.
 
 ## High-Level Diagram
 
@@ -28,7 +28,7 @@ flowchart TD
 
 ## Layered Architecture
 
-StatusForge is organized as a layered backend with an embedded frontend distribution:
+Statora is organized as a layered backend with an embedded frontend distribution:
 
 1. **Entry and runtime bootstrap**
    - `cmd/server/main.go` starts `server.RunServer()`.

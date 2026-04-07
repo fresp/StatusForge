@@ -23,7 +23,7 @@ const categoryPayload = {
 
 const settingsPayload = {
   head: { title: '', description: '', keywords: '', faviconUrl: '', metaTags: {} },
-  branding: { siteName: 'StatusForge', logoUrl: '', backgroundImageUrl: '', heroImageUrl: '' },
+  branding: { siteName: 'Statora', logoUrl: '', backgroundImageUrl: '', heroImageUrl: '' },
   theme: { preset: 'default' },
   layout: { variant: 'classic' },
   footer: { text: '', showPoweredBy: false },

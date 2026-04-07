@@ -16,12 +16,12 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/fresp/StatusForge/internal/models"
-	"github.com/fresp/StatusForge/internal/repository"
+	"github.com/fresp/Statora/internal/models"
+	"github.com/fresp/Statora/internal/repository"
 )
 
 const (
-	defaultMFAIssuer          = "StatusForge"
+	defaultMFAIssuer          = "Statora"
 	defaultRecoveryCodesCount = 8
 	totpPeriodSeconds         = 30
 	totpDigits                = 6

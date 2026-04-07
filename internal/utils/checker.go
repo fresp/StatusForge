@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	monitordomain "github.com/fresp/StatusForge/internal/domain/monitor"
+	monitordomain "github.com/fresp/Statora/internal/domain/monitor"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )

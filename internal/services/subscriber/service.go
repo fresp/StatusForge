@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	shared "github.com/fresp/StatusForge/internal/domain/shared"
-	"github.com/fresp/StatusForge/internal/models"
-	"github.com/fresp/StatusForge/internal/repository"
+	shared "github.com/fresp/Statora/internal/domain/shared"
+	"github.com/fresp/Statora/internal/models"
+	"github.com/fresp/Statora/internal/repository"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

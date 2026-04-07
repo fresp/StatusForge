@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/internal/models"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,9 +20,8 @@ var (
 		"default":  {},
 		"ocean":    {},
 		"graphite": {},
-		"ember": {},
-		"frost": {},
-
+		"ember":    {},
+		"frost":    {},
 	}
 	colorHexPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 )

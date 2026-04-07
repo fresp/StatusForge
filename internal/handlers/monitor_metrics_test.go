@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fresp/StatusForge/internal/models"
-	statusservice "github.com/fresp/StatusForge/internal/services/status"
+	"github.com/fresp/Statora/internal/models"
+	statusservice "github.com/fresp/Statora/internal/services/status"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

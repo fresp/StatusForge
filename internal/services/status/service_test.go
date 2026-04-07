@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson/primitive"

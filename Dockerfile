@@ -1,4 +1,4 @@
-# Multi-stage build for StatusForge unified server
+# Multi-stage build for Statora unified server
 FROM node:20-alpine AS frontend-build
 
 WORKDIR /app

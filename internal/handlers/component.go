@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/internal/models"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

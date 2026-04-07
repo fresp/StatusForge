@@ -10,8 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/fresp/StatusForge/internal/middleware"
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/internal/middleware"
+	"github.com/fresp/Statora/internal/models"
 )
 
 type mfaStubUserRepo struct {
@@ -110,7 +110,7 @@ func TestStartEnrollmentReturnsSecretAndRecoveryCodes(t *testing.T) {
 	require.NotNil(t, result)
 	assert.NotEmpty(t, result.Secret)
 	assert.Contains(t, result.OTPAuthURL, "otpauth://totp/")
-	assert.Contains(t, result.OTPAuthURL, "issuer=StatusForge")
+	assert.Contains(t, result.OTPAuthURL, "issuer=Statora")
 	assert.Len(t, result.RecoveryCodes, defaultRecoveryCodesCount)
 
 	assert.True(t, repo.beginEnrollmentCalled)

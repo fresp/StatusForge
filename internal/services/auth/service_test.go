@@ -9,8 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/fresp/StatusForge/internal/middleware"
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/internal/middleware"
+	"github.com/fresp/Statora/internal/models"
 )
 
 type stubUserRepo struct {

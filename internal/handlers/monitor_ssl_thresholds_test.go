@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	monitorservice "github.com/fresp/StatusForge/internal/services/monitor"
+	monitorservice "github.com/fresp/Statora/internal/services/monitor"
 )
 
 func TestSanitizeSSLThresholds_DefaultWhenEmpty(t *testing.T) {

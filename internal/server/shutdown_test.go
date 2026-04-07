@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/fresp/StatusForge/configs"
-	"github.com/fresp/StatusForge/internal/database"
+	"github.com/fresp/Statora/configs"
+	"github.com/fresp/Statora/internal/database"
 )
 
 // TestGracefulShutdown tests that the server shuts down gracefully when signaled

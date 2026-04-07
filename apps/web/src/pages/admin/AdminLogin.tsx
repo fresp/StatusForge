@@ -5,7 +5,7 @@ import { clearAuthSession, setAuthSession } from '../../lib/auth'
 import { useApi } from '../../hooks/useApi'
 import type { LoginResponse, MfaVerifyResponse, StatusPageSettings, User } from '../../types'
 
-const DEFAULT_PAGE_TITLE = 'StatusForge'
+const DEFAULT_PAGE_TITLE = 'Statora'
 
 export default function AdminLogin() {
   const navigate = useNavigate()

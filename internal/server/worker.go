@@ -16,8 +16,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/fresp/StatusForge/internal/models"
-	"github.com/fresp/StatusForge/internal/utils"
+	"github.com/fresp/Statora/internal/models"
+	"github.com/fresp/Statora/internal/utils"
 )
 
 // workerCtx and workerCancel are used to signal shutdown to all worker goroutines

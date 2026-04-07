@@ -3,7 +3,7 @@ package monitor
 import (
 	"testing"
 
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/internal/models"
 )
 
 func TestValidateAdvancedOptions_RejectsIgnoreTLSForNonHTTP(t *testing.T) {

@@ -1,6 +1,6 @@
 package status
 
-import "github.com/fresp/StatusForge/internal/models"
+import "github.com/fresp/Statora/internal/models"
 
 func ComponentSeverityRank(componentStatus models.ComponentStatus) int {
 	switch componentStatus {

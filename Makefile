@@ -1,10 +1,10 @@
 # ============================================================
-#  StatusForge — Docker Compose Makefile
+#  Statora — Docker Compose Makefile
 # ============================================================
 
 COMPOSE       := docker compose
 COMPOSE_FILE  := docker-compose.yml
-PROJECT_NAME  := statusforge
+PROJECT_NAME  := Statora
 
 # Default target
 .DEFAULT_GOAL := help
@@ -110,7 +110,7 @@ clean-all: down-v ## Stop services, remove volumes, and prune images
 .PHONY: help
 help: ## Show this help message
 	@echo ""
-	@echo "  StatusForge — Available Commands"
+	@echo "  Statora — Available Commands"
 	@echo "  ================================"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \

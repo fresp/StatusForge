@@ -1,19 +1,19 @@
-# StatusForge
+# Statora
 
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
-![License](https://img.shields.io/github/license/fresp/StatusForge)
-![Last Commit](https://img.shields.io/github/last-commit/fresp/StatusForge)
+![License](https://img.shields.io/github/license/fresp/Statora)
+![Last Commit](https://img.shields.io/github/last-commit/fresp/Statora)
 
-StatusForge is a self-hosted status page and uptime monitoring platform.
+Statora is a self-hosted status page and uptime monitoring platform.
 
 It helps you monitor services, publish incidents, schedule maintenance, and share real-time status updates from one place.
 
 ## Overview
 
-StatusForge is built for teams that want a simple way to communicate service health without giving up control of their own infrastructure.
+The name Statora is derived from the ideas of “state” and “awareness/orchestration”, reflecting its role as a central system that continuously understands service conditions and turns them into clear, reliable communication.
 
-With StatusForge, you can:
+With Statora, you can:
 
 - Show a clean public status page for your services
 - Track incidents and post updates as things happen
@@ -75,13 +75,13 @@ With StatusForge, you can:
 
 ## Quick Start
 
-The fastest way to run StatusForge locally is with Docker Compose.
+The fastest way to run Statora locally is with Docker Compose.
 
 ### Run with Docker Compose
 
 ```bash
-git clone https://github.com/fresp/StatusForge.git
-cd StatusForge
+git clone https://github.com/fresp/Statora.git
+cd Statora
 cp .env.example .env
 docker compose up --build
 ```
@@ -114,7 +114,7 @@ Change these immediately for any shared or persistent environment.
 
 ## Self-Hosted by Design
 
-StatusForge is designed to give teams control over their status workflow, monitoring setup, and public communication without depending on a hosted third-party service.
+Statora is designed to give teams control over their status workflow, monitoring setup, and public communication without depending on a hosted third-party service.
 
 ## Roadmap
 

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/fresp/Statora/internal/embed"
 	"github.com/gin-gonic/gin"
-	"github.com/fresp/StatusForge/internal/embed"
 )
 
 func StaticFileServer() gin.HandlerFunc {

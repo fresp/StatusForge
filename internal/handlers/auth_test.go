@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/fresp/StatusForge/internal/models"
-	authservice "github.com/fresp/StatusForge/internal/services/auth"
+	"github.com/fresp/Statora/internal/models"
+	authservice "github.com/fresp/Statora/internal/services/auth"
 )
 
 type stubLoginService struct {

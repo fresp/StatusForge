@@ -8,11 +8,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/fresp/Statora/internal/models"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"github.com/fresp/StatusForge/internal/models"
 )
 
 func main() {

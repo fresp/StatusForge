@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	incidentservice "github.com/fresp/StatusForge/internal/services/incident"
+	incidentservice "github.com/fresp/Statora/internal/services/incident"
 
-	"github.com/fresp/StatusForge/internal/models"
-	"github.com/fresp/StatusForge/internal/repository"
+	"github.com/fresp/Statora/internal/models"
+	"github.com/fresp/Statora/internal/repository"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

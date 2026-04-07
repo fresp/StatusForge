@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/fresp/StatusForge/configs"
-	"github.com/fresp/StatusForge/internal/handlers"
-	"github.com/fresp/StatusForge/internal/middleware"
+	"github.com/fresp/Statora/configs"
+	"github.com/fresp/Statora/internal/handlers"
+	"github.com/fresp/Statora/internal/middleware"
 )
 
 func TestAdminOnlyRoutesForbidOperatorRole(t *testing.T) {

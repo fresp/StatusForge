@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	shared "github.com/fresp/StatusForge/internal/domain/shared"
+	shared "github.com/fresp/Statora/internal/domain/shared"
 	"github.com/gin-gonic/gin"
 )
 

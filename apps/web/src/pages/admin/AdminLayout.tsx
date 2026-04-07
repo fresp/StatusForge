@@ -22,7 +22,7 @@ import type { UserRole } from '../../types'
 import type { StatusPageSettings } from '../../types'
 import { useApi } from '../../hooks/useApi'
 
-const DEFAULT_PAGE_TITLE = 'StatusForge'
+const DEFAULT_PAGE_TITLE = 'Statora'
 
 interface StoredAdminProfile {
   role?: UserRole

@@ -6,7 +6,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/fresp/StatusForge/internal/models"
+	"github.com/fresp/Statora/internal/models"
 	"github.com/gin-gonic/gin"
 )
 

@@ -18,8 +18,8 @@ export default function Footer({ centerText, showPoweredBy }: FooterProps) {
           {showPoweredBy && (
             <div className="font-medium" style={{ color: 'var(--text-muted)' }}>
               Powered by{" "}
-              <a href="https://github.com/fresp/StatusForge">
-                StatusForge
+              <a href="https://github.com/fresp/Statora">
+                Statora
               </a>
             </div>
           )}
