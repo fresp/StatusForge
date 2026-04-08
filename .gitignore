@@ -98,5 +98,6 @@ apps/web/node_modules/
 .worktrees/
 /docs/*
 !/docs/architecture.md
+!/docs/example/
 !/docs/screenshots/
 !/docs/screenshots/*.png
