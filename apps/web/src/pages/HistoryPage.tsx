@@ -1,15 +1,21 @@
-import React, { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { BarChart3, ChevronLeft, ChevronRight, History, TimerReset } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { IncidentCarouselGroup } from '../components/IncidentCarouselGroup'
 import Footer from '../components/layout/Footer'
-import type { Incident, StatusPageSettings } from '../types'
+import StatusTopNav from '../components/status/StatusTopNav'
+import type { Incident, StatusPageSettings, StatusSummary } from '../types'
 import {
   formatDate,
   groupIncidentsByStatus,
 } from '../lib/utils'
 import { loadThemePresetStylesheet, getThemePresets, DEFAULT_THEME_PRESET } from '../lib/themePresetLoader'
+import {
+  DEFAULT_STATUS_PAGE_SETTINGS,
+  applyStatusPageHeadSettings,
+  normalizeStatusPageSettings,
+  readCachedStatusPageSettings,
+} from '../lib/statusPageSettings'
 
 interface QuarterCursor {
   year: number
@@ -60,6 +66,10 @@ function formatQuarterLabel(cursor: QuarterCursor): string {
   return `${MONTH_SHORT[startMonth]} – ${MONTH_SHORT[endMonth]} ${cursor.year}`
 }
 
+function formatQuarterChip(cursor: QuarterCursor): string {
+  return `Q${cursor.quarter + 1} ${cursor.year}`
+}
+
 function getQuarterDateRange(cursor: QuarterCursor, today: Date): { startDate: string; endDate: string } {
   const quarterStartMonth = cursor.quarter * 3
   const start = new Date(cursor.year, quarterStartMonth, 1)
@@ -99,10 +109,50 @@ function groupIncidentsByQuarterMonths(incidents: Incident[], cursor: QuarterCur
   })
 }
 
+function getMeanTimeToResolveMinutes(incidents: Incident[]): number | null {
+  const resolvedWithDuration = incidents.filter((incident) => incident.resolvedAt)
+  if (resolvedWithDuration.length === 0) {
+    return null
+  }
+
+  const totalMinutes = resolvedWithDuration.reduce((sum, incident) => {
+    const startedAt = new Date(incident.createdAt).getTime()
+    const resolvedAt = new Date(incident.resolvedAt as string).getTime()
+    return sum + Math.max(0, resolvedAt - startedAt) / (1000 * 60)
+  }, 0)
+
+  return Math.round(totalMinutes / resolvedWithDuration.length)
+}
+
+function formatMinutesLabel(totalMinutes: number | null): string {
+  if (totalMinutes === null) {
+    return '—'
+  }
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`
+  }
+
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`
+}
+
+function getMonthEmptyMessage(monthLabel: string): string {
+  return `No incidents reported in ${monthLabel}.`
+}
+
+const sectionCardStyle: CSSProperties = {
+  backgroundColor: 'var(--status-card-bg, rgba(255,255,255,0.88))',
+  borderColor: 'var(--status-card-border, rgba(181,197,226,0.32))',
+  boxShadow: 'var(--status-card-shadow, 0 24px 60px rgba(20,37,63,0.08))',
+}
+
 export default function HistoryPage() {
   const today = useMemo(() => new Date(), [])
   const currentQuarter = useMemo(() => getCurrentQuarterCursor(today), [today])
   const [selectedQuarter, setSelectedQuarter] = useState<QuarterCursor>(currentQuarter)
+  const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set())
 
   const quarterRange = useMemo(() => getQuarterDateRange(selectedQuarter, today), [selectedQuarter, today])
   const incidentsUrl = useMemo(
@@ -113,8 +163,13 @@ export default function HistoryPage() {
 
   const { data: incidentData, loading: incidentsLoading, error: incidentsError } =
     useApi<{ active: Incident[]; resolved: Incident[] }>(incidentsUrl, [incidentsUrl])
+  const { data: summaryData } = useApi<StatusSummary>('/status/summary')
   const { data: settingsData } = useApi<StatusPageSettings>('/status/settings')
-  const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set())
+
+  const settings = useMemo(
+    () => normalizeStatusPageSettings(settingsData ?? readCachedStatusPageSettings() ?? DEFAULT_STATUS_PAGE_SETTINGS),
+    [settingsData]
+  )
 
   const allIncidents = useMemo(
     () => [...(incidentData?.active ?? []), ...(incidentData?.resolved ?? [])],
@@ -127,176 +182,281 @@ export default function HistoryPage() {
   )
 
   const canGoNext = toQuarterIndex(selectedQuarter) < toQuarterIndex(currentQuarter)
+  const overallStatus = summaryData?.overallStatus ?? 'operational'
+  const totalIncidents = allIncidents.length
+  const totalResolved = allIncidents.filter((incident) => Boolean(incident.resolvedAt)).length
+  const meanTimeToResolve = useMemo(() => getMeanTimeToResolveMinutes(allIncidents), [allIncidents])
 
-  const themePreset = (settingsData?.theme?.preset?.trim() || DEFAULT_THEME_PRESET).endsWith('.css')
-    ? settingsData?.theme?.preset?.trim() || DEFAULT_THEME_PRESET
-    : `${settingsData?.theme?.preset?.trim() || DEFAULT_THEME_PRESET}.css`
+  const themePreset = (settings.theme.preset?.trim() || DEFAULT_THEME_PRESET).endsWith('.css')
+    ? settings.theme.preset.trim() || DEFAULT_THEME_PRESET
+    : `${settings.theme.preset.trim() || DEFAULT_THEME_PRESET}.css`
 
-  React.useEffect(() => {
-    const pageTitle = settingsData?.head?.title?.trim() || 'Status Page'
-    document.title = `${pageTitle} - Incident History`
-  }, [settingsData?.head?.title])
+  const activeQuarterMonthIndexes = useMemo(
+    () => monthBuckets.filter((monthGroup) => monthGroup.incidents.length > 0).map((monthGroup) => monthGroup.monthIndex),
+    [monthBuckets]
+  )
 
-  React.useEffect(() => {
+  const primaryMonthIndex = activeQuarterMonthIndexes[0] ?? monthBuckets[0]?.monthIndex ?? selectedQuarter.quarter * 3
+
+  const monthChips = useMemo(
+    () => monthBuckets
+      .slice()
+      .sort((a, b) => a.monthIndex - b.monthIndex)
+      .map((monthGroup) => ({
+        label: monthGroup.monthLabel,
+        active: monthGroup.monthIndex === primaryMonthIndex,
+        hasIncidents: monthGroup.incidents.length > 0,
+      })),
+    [monthBuckets, primaryMonthIndex]
+  )
+
+  useEffect(() => {
+    applyStatusPageHeadSettings({
+      ...settings,
+      head: {
+        ...settings.head,
+        title: `${settings.head.title} - Incident History`,
+      },
+    })
+  }, [settings])
+
+  useEffect(() => {
     const presets = getThemePresets().presets
     loadThemePresetStylesheet(themePreset, presets).catch(() => { })
   }, [themePreset])
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="min-h-screen"
       style={{
         backgroundColor: 'var(--bg)',
         color: 'var(--text)',
         fontFamily: 'var(--font-family)',
+        backgroundImage: settings.branding.backgroundImageUrl
+          ? `linear-gradient(var(--bg-image-overlay), var(--bg-image-overlay)), url(${settings.branding.backgroundImageUrl})`
+          : undefined,
+        backgroundSize: settings.branding.backgroundImageUrl ? 'cover' : undefined,
+        backgroundAttachment: settings.branding.backgroundImageUrl ? 'fixed' : undefined,
+        backgroundPosition: settings.branding.backgroundImageUrl ? 'center' : undefined,
       }}
     >
-      <main className="flex-1">
-        <div
-          className="py-10 px-4 border-b"
-          style={{
-            borderColor: 'var(--border)',
-            backgroundColor: 'var(--surface)',
-          }}
-        >
-          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">Incident History</h1>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                Browse incidents by quarter and month.
-              </p>
-            </div>
-            <Link
-              to="/"
-              className="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium border"
-              style={{
-                borderColor: 'var(--border)',
-                color: 'var(--text)',
-                backgroundColor: 'var(--surface)',
-              }}
-            >
-              Back to Main View
-            </Link>
-          </div>
-        </div>
+      <StatusTopNav
+        siteName={settings.branding.siteName}
+        logoUrl={settings.branding.logoUrl}
+        statusLabel={overallStatus === 'operational' ? 'stable' : 'attention'}
+        activeView="history"
+      />
 
-        <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      <main className="pb-16">
+        <section className="px-4 pt-5 md:px-6 md:pt-8">
           <div
-            className="rounded-md border p-4 flex items-center justify-between"
+            className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] px-6 py-8 shadow-[0_34px_80px_rgba(15,143,103,0.16)] md:px-10 md:py-12"
             style={{
-              borderColor: 'var(--border)',
-              backgroundColor: 'var(--surface)',
+              background: 'linear-gradient(135deg, color-mix(in srgb, var(--surface) 34%, white) 0%, var(--status-card-bg, rgba(255,255,255,0.88)) 48%, color-mix(in srgb, var(--primary) 8%, var(--surface)) 100%)',
+              border: '1px solid var(--status-card-border, rgba(181,197,226,0.32))',
             }}
           >
-            <button
-              onClick={() => setSelectedQuarter((prev) => shiftQuarter(prev, -1))}
-              className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium border"
-              style={{
-                borderColor: 'var(--border)',
-                color: 'var(--text)',
-                backgroundColor: 'var(--surface)',
-              }}
-              aria-label="Show previous quarter"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Prev
-            </button>
+            <div
+              className="absolute right-0 top-0 h-52 w-52 -translate-y-1/3 translate-x-1/4 rounded-full blur-3xl md:h-72 md:w-72"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 16%, transparent)' }}
+            />
+            <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end">
+              <div className="max-w-3xl">
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 backdrop-blur-md" style={{ borderColor: 'color-mix(in srgb, var(--border) 40%, transparent)', backgroundColor: 'color-mix(in srgb, var(--surface) 72%, transparent)' }}>
+                  <History className="h-4 w-4" style={{ color: 'var(--primary)' }} />
+                  <span className="text-[11px] font-extrabold uppercase tracking-[0.32em]" style={{ color: 'var(--text-subtle)' }}>
+                    System reliability archive
+                  </span>
+                </div>
+                <h1 className="max-w-3xl text-4xl font-black leading-[0.95] tracking-[-0.04em] md:text-6xl" style={{ color: 'var(--text)' }}>
+                  Incident history with
+                  <span className="block" style={{ color: 'var(--primary)' }}>editorial clarity.</span>
+                </h1>
+                <p className="mt-5 max-w-2xl text-sm font-medium leading-6 md:text-lg md:leading-8" style={{ color: 'var(--text-muted)' }}>
+                  A transparent archive of operational events, grouped by quarter and month so teams can trace reliability trends without losing incident detail.
+                </p>
+              </div>
 
-            <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-              {'< '} {formatQuarterLabel(selectedQuarter)} {' >'}
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <div className="rounded-[1.5rem] p-5" style={{ backgroundColor: 'var(--primary)', color: 'var(--on-primary, #fff)' }}>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] opacity-80">Quarter view</p>
+                  <p className="mt-3 text-3xl font-black tracking-[-0.04em]">{formatQuarterChip(selectedQuarter)}</p>
+                  <p className="mt-2 text-sm opacity-90">{totalIncidents} archived incidents</p>
+                </div>
+                <div className="rounded-[1.5rem] p-5" style={{ ...sectionCardStyle, backgroundColor: 'color-mix(in srgb, var(--status-card-bg, rgba(255,255,255,0.88)) 78%, var(--primary) 6%)' }}>
+                  <TimerReset className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+                  <p className="mt-4 text-[11px] font-extrabold uppercase tracking-[0.24em]" style={{ color: 'var(--text-subtle)' }}>Mean resolve time</p>
+                  <p className="mt-2 text-3xl font-black tracking-[-0.04em]" style={{ color: 'var(--text)' }}>{formatMinutesLabel(meanTimeToResolve)}</p>
+                </div>
+                <div className="rounded-[1.5rem] p-5" style={{ ...sectionCardStyle, backgroundColor: 'color-mix(in srgb, var(--status-card-bg, rgba(255,255,255,0.88)) 78%, var(--primary) 6%)' }}>
+                  <BarChart3 className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+                  <p className="mt-4 text-[11px] font-extrabold uppercase tracking-[0.24em]" style={{ color: 'var(--text-subtle)' }}>Resolved in range</p>
+                  <p className="mt-2 text-3xl font-black tracking-[-0.04em]" style={{ color: 'var(--text)' }}>{totalResolved}</p>
+                </div>
+              </div>
             </div>
-
-            <button
-              onClick={() => setSelectedQuarter((prev) => shiftQuarter(prev, 1))}
-              disabled={!canGoNext}
-              className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium border disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                borderColor: 'var(--border)',
-                color: 'var(--text)',
-                backgroundColor: 'var(--surface)',
-              }}
-              aria-label="Show next quarter"
-            >
-              Next
-              <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
+        </section>
 
-          {incidentsLoading ? (
-            <div
-              className="rounded-md border p-6"
-              style={{
-                borderColor: 'var(--border)',
-                backgroundColor: 'var(--surface)',
-              }}
-            >
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading incidents...</p>
-            </div>
-          ) : incidentsError ? (
-            <div
-              className="rounded-md border p-6"
-              style={{
-                borderColor: 'var(--border)',
-                backgroundColor: 'var(--surface)',
-              }}
-            >
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Unable to load incidents for this quarter.
-              </p>
-            </div>
-          ) : (
-            <section className="space-y-4">
-              {monthBuckets.map((monthGroup) => (
-                <div
-                  key={`${selectedQuarter.year}-${monthGroup.monthIndex}`}
-                  className="rounded-md border p-5"
+        <section className="px-4 pt-8 md:px-6 md:pt-10">
+          <div className="mx-auto max-w-6xl rounded-[1.8rem] border p-5 md:p-6" style={sectionCardStyle}>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.32em]" style={{ color: 'var(--text-subtle)' }}>
+                  Time navigation
+                </p>
+                <h2 className="mt-3 text-2xl font-black tracking-[-0.03em] md:text-3xl" style={{ color: 'var(--text)' }}>
+                  {formatQuarterLabel(selectedQuarter)}
+                </h2>
+                <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+                  Review the quarter archive month by month and inspect each incident timeline in full context.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 self-start lg:self-auto">
+                <button
+                  onClick={() => setSelectedQuarter((prev) => shiftQuarter(prev, -1))}
+                  className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em]"
                   style={{
-                    borderColor: 'var(--border)',
                     backgroundColor: 'var(--surface)',
+                    color: 'var(--text-muted)',
+                  }}
+                  aria-label="Show previous quarter"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </button>
+                <button
+                  onClick={() => setSelectedQuarter((prev) => shiftQuarter(prev, 1))}
+                  disabled={!canGoNext}
+                  className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    color: 'var(--text-muted)',
+                  }}
+                  aria-label="Show next quarter"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              {monthChips.map((chip) => (
+                <span
+                  key={chip.label}
+                  className="inline-flex items-center rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.16em]"
+                  style={{
+                    backgroundColor: chip.active ? 'var(--status-pill-bg, rgba(16,185,129,0.1))' : 'color-mix(in srgb, var(--surface) 92%, transparent)',
+                    color: chip.active ? 'var(--status-pill-text, var(--primary))' : (chip.hasIncidents ? 'var(--text-muted)' : 'var(--text-subtle)'),
+                    border: chip.active ? '1px solid transparent' : '1px solid color-mix(in srgb, var(--border) 40%, transparent)',
                   }}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold">{monthGroup.monthLabel}</h3>
-                    <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
-                      {monthGroup.incidents.length} incident{monthGroup.incidents.length === 1 ? '' : 's'}
-                    </span>
+                  {chip.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 pt-8 md:px-6 md:pt-10">
+          <div className="mx-auto max-w-6xl space-y-6 md:space-y-8">
+            {incidentsLoading ? (
+              <div className="rounded-[1.8rem] border p-6 md:p-8" style={sectionCardStyle}>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading incidents...</p>
+              </div>
+            ) : incidentsError ? (
+              <div className="rounded-[1.8rem] border p-6 md:p-8" style={sectionCardStyle}>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  Unable to load incidents for this quarter.
+                </p>
+              </div>
+            ) : (
+              monthBuckets.map((monthGroup) => (
+                <div
+                  key={`${selectedQuarter.year}-${monthGroup.monthIndex}`}
+                  className="rounded-[1.8rem] border p-5 md:p-7"
+                  style={sectionCardStyle}
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5" style={{ backgroundColor: 'color-mix(in srgb, var(--surface) 86%, transparent)' }}>
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: monthGroup.incidents.length > 0 ? 'var(--primary)' : 'var(--text-subtle)' }} />
+                        <span className="text-[11px] font-extrabold uppercase tracking-[0.24em]" style={{ color: 'var(--text-subtle)' }}>
+                          Month archive
+                        </span>
+                      </div>
+                      <h2 className="mt-4 text-2xl font-black tracking-[-0.03em] md:text-3xl" style={{ color: 'var(--text)' }}>
+                        {monthGroup.monthLabel}
+                      </h2>
+                    </div>
+                    <div className="text-left md:text-right">
+                      <p className="text-[11px] font-extrabold uppercase tracking-[0.24em]" style={{ color: 'var(--text-subtle)' }}>
+                        Incidents in month
+                      </p>
+                      <p className="mt-2 text-3xl font-black tracking-[-0.04em]" style={{ color: 'var(--text)' }}>
+                        {monthGroup.incidents.length}
+                      </p>
+                    </div>
                   </div>
 
                   {monthGroup.incidents.length === 0 ? (
-                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                      No incidents reported in this month.
-                    </p>
+                    <div className="mt-6 rounded-[1.5rem] px-6 py-10 text-center" style={{ backgroundColor: 'color-mix(in srgb, var(--surface) 90%, transparent)' }}>
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full" style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 16%, transparent)' }}>
+                        <History className="h-7 w-7" style={{ color: 'var(--primary)' }} />
+                      </div>
+                      <h3 className="mt-5 text-xl font-black tracking-[-0.02em]" style={{ color: 'var(--text)' }}>
+                        Quiet month
+                      </h3>
+                      <p className="mx-auto mt-3 max-w-md text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+                        {getMonthEmptyMessage(monthGroup.monthLabel)} The archive remained clear for this period.
+                      </p>
+                    </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="mt-6 space-y-5">
                       {groupIncidentsByStatus(monthGroup.incidents).map((statusGroup) => (
-                        <IncidentCarouselGroup
+                        <div
                           key={`${selectedQuarter.year}-${monthGroup.monthIndex}-${statusGroup.key}`}
-                          title={statusGroup.label}
-                          subtitle={`${monthGroup.monthLabel} · ${formatDate(monthGroup.incidents[0].createdAt).split(',')[2]?.trim() || selectedQuarter.year}`}
-                          incidents={statusGroup.incidents}
-                          expandedIncidents={expandedIncidents}
-                          onToggleExpand={(incidentId) => {
-                            setExpandedIncidents((prev) => {
-                              const next = new Set(prev)
-                              if (next.has(incidentId)) {
-                                next.delete(incidentId)
-                              } else {
-                                next.add(incidentId)
-                              }
-                              return next
-                            })
+                          className="rounded-[1.4rem] border px-4 py-3 md:px-5"
+                          style={{
+                            borderColor: 'color-mix(in srgb, var(--status-card-border, rgba(181,197,226,0.32)) 72%, transparent)',
+                            backgroundColor: 'color-mix(in srgb, var(--surface) 92%, transparent)',
                           }}
-                        />
+                        >
+                          <IncidentCarouselGroup
+                            title={statusGroup.label}
+                            subtitle={`${monthGroup.monthLabel} · ${formatDate(monthGroup.incidents[0].createdAt).split(',')[2]?.trim() || selectedQuarter.year}`}
+                            incidents={statusGroup.incidents}
+                            expandedIncidents={expandedIncidents}
+                            onToggleExpand={(incidentId) => {
+                              setExpandedIncidents((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(incidentId)) {
+                                  next.delete(incidentId)
+                                } else {
+                                  next.add(incidentId)
+                                }
+                                return next
+                              })
+                            }}
+                          />
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
-              ))}
-            </section>
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        </section>
       </main>
-      <Footer centerText={settingsData?.footer?.text} showPoweredBy={settingsData?.footer?.showPoweredBy} />
+
+      <Footer
+        centerText={settings.footer.text}
+        showPoweredBy={false}
+        showHistoryLink={false}
+      />
     </div>
   )
 }

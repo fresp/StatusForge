@@ -29,13 +29,13 @@ function getImpactToken(impact: Incident['impact']): string {
 function getStatusToken(status: Incident['status']): string {
   switch (status) {
     case 'investigating':
-      return '--warning'
+      return '--status-degraded'
     case 'identified':
-      return '--partial'
+      return '--status-partial'
     case 'monitoring':
-      return '--info'
+      return '--primary'
     case 'resolved':
-      return '--success'
+      return '--status-resolved-text'
     default:
       return '--text-subtle'
   }

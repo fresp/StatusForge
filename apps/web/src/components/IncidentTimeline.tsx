@@ -1,4 +1,3 @@
-import React from 'react'
 import type { IncidentUpdate } from '../types'
 import { INCIDENT_STATUS_LABELS, formatDate } from '../lib/utils'
 
@@ -9,13 +8,13 @@ interface IncidentTimelineProps {
 function getIncidentStatusToken(status: string): string {
   switch (status) {
     case 'investigating':
-      return '--warning'
+      return '--status-degraded'
     case 'identified':
-      return '--partial'
+      return '--status-partial'
     case 'monitoring':
-      return '--info'
+      return '--primary'
     case 'resolved':
-      return '--success'
+      return '--status-resolved-text'
     default:
       return '--text-subtle'
   }
