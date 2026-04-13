@@ -12,7 +12,7 @@ interface AdminListCardProps {
  */
 export function AdminListCard({ children }: AdminListCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="admin-surface">
       {children}
     </div>
   )
@@ -32,7 +32,7 @@ interface AdminTableEmptyRowProps {
 export function AdminTableEmptyRow({ colSpan, children }: AdminTableEmptyRowProps) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-6 py-12 text-center text-gray-400">
+      <td colSpan={colSpan} className="px-6 py-12 text-center text-slate-500 text-sm">
         {children}
       </td>
     </tr>
@@ -49,7 +49,7 @@ interface AdminListStateMessageProps {
  * admin list containers.
  */
 export function AdminListStateMessage({ tone = 'default', children }: AdminListStateMessageProps) {
-  const colorClass = tone === 'error' ? 'text-red-600' : 'text-gray-500'
+  const colorClass = tone === 'error' ? 'text-red-500' : 'text-slate-500'
 
   return (
     <div className={`px-6 py-8 text-sm ${colorClass}`}>

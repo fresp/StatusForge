@@ -55,16 +55,16 @@ export default function AdminPaginationControls({
   const buttons = buildPageButtons(safePage, safeTotalPages)
 
   return (
-    <div className="flex flex-col gap-3 border-t border-gray-100 px-6 py-4 md:flex-row md:items-center md:justify-between">
-      <div className="text-xs text-gray-500">
-        Showing <span className="font-medium text-gray-700">{start}</span>-
-        <span className="font-medium text-gray-700">{end}</span> of{' '}
-        <span className="font-medium text-gray-700">{total}</span>
-        {loading && <span className="ml-2 text-gray-400">Loading...</span>}
+    <div className="flex flex-col gap-3 border-t border-slate-200/80 bg-slate-50/70 px-6 py-4 md:flex-row md:items-center md:justify-between">
+      <div className="text-xs text-slate-500">
+        Showing <span className="font-semibold text-slate-700">{start}</span>-
+        <span className="font-semibold text-slate-700">{end}</span> of{' '}
+        <span className="font-semibold text-slate-700">{total}</span>
+        {loading && <span className="ml-2 text-slate-400">Loading...</span>}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs text-gray-500" htmlFor="admin-page-size">
+        <label className="text-xs font-medium text-slate-500" htmlFor="admin-page-size">
           Rows
         </label>
         <select
@@ -72,7 +72,7 @@ export default function AdminPaginationControls({
           value={limit}
           disabled={loading}
           onChange={(event) => onLimitChange(Number.parseInt(event.target.value, 10))}
-          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 disabled:opacity-60"
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-sm disabled:opacity-60"
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
@@ -85,7 +85,7 @@ export default function AdminPaginationControls({
           type="button"
           onClick={() => onPageChange(safePage - 1)}
           disabled={!canGoPrev}
-          className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Previous
         </button>
@@ -97,15 +97,15 @@ export default function AdminPaginationControls({
 
             return (
               <React.Fragment key={buttonPage}>
-                {showGap && <span className="px-1 text-xs text-gray-400">…</span>}
+                {showGap && <span className="px-1 text-xs text-slate-400">…</span>}
                 <button
                   type="button"
                   onClick={() => onPageChange(buttonPage)}
                   disabled={loading || buttonPage === safePage}
-                  className={`rounded-md px-2.5 py-1.5 text-xs ${buttonPage === safePage
-                      ? 'bg-gray-900 text-white'
-                      : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    } disabled:cursor-not-allowed disabled:opacity-70`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium shadow-sm transition-colors ${buttonPage === safePage
+                      ? 'border border-blue-500/20 bg-gradient-to-b from-blue-500 to-blue-600 text-white'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                     } disabled:cursor-not-allowed disabled:opacity-70`}
                 >
                   {buttonPage}
                 </button>
@@ -118,7 +118,7 @@ export default function AdminPaginationControls({
           type="button"
           onClick={() => onPageChange(safePage + 1)}
           disabled={!canGoNext}
-          className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
         </button>

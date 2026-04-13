@@ -5,6 +5,7 @@ import { useApi } from '../../hooks/useApi'
 import { useAdminPagination } from '../../hooks/useAdminPagination'
 import type { UserInvitation, UserMember, UserRole, UserStatus } from '../../types'
 import AdminPaginationControls from '../../components/AdminPaginationControls'
+import Modal from '../../components/Modal'
 import UserSearch from '../../components/UserSearch'
 
 const ROLE_OPTIONS: UserRole[] = ['admin', 'operator']
@@ -17,9 +18,9 @@ const STATUS_LABELS: Record<UserStatus, string> = {
 }
 
 const STATUS_BADGE_CLASS: Record<UserStatus, string> = {
-  active: 'bg-green-100 text-green-700',
-  disabled: 'bg-red-100 text-red-700',
-  invited: 'bg-yellow-100 text-yellow-700',
+  active: 'badge badge-success',
+  disabled: 'badge badge-error',
+  invited: 'badge badge-warning',
 }
 
 interface MeResponse {
@@ -234,64 +235,66 @@ export default function AdminMembers() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-6xl">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage user accounts, roles, and status</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Users</h1>
+          <p className="mt-1 text-sm text-slate-500">Manage user accounts, roles, invitations, and access state.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            void refetch()
-            void refetchInvitations()
-          }}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
-        <button
-          type="button"
-          onClick={openInviteModal}
-          className="ml-2 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
-        >
-          <Plus className="w-4 h-4" />
-          Invite User
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              void refetch()
+              void refetchInvitations()
+            }}
+            disabled={loading}
+            className="admin-btn-secondary"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={openInviteModal}
+            className="admin-btn-primary"
+          >
+            <Plus className="h-4 w-4" />
+            Invite User
+          </button>
+        </div>
       </div>
 
       {actionError && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
           {actionError}
         </div>
       )}
 
       {error && !loading && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
           Failed to load users.
         </div>
       )}
 
       {loading && members.length === 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
+        <div className="admin-surface p-10 text-center text-sm text-slate-500">
           Loading users...
         </div>
       )}
 
       {!loading && !error && members.length === 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
+        <div className="admin-surface p-10 text-center text-sm text-slate-500">
           No users found.
         </div>
       )}
 
-      <div className="mb-5">
-        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+      <div className="mb-6">
+        <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 shadow-sm">
           <button
             type="button"
             onClick={() => setActiveTab('members')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'members' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${activeTab === 'members' ? 'bg-gradient-to-b from-blue-500 to-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
               }`}
           >
             Users
@@ -299,7 +302,7 @@ export default function AdminMembers() {
           <button
             type="button"
             onClick={() => setActiveTab('invitations')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'invitations' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${activeTab === 'invitations' ? 'bg-gradient-to-b from-blue-500 to-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
               }`}
           >
             Invitations
@@ -312,17 +315,17 @@ export default function AdminMembers() {
       )}
 
       {activeTab === 'members' && members.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="admin-surface">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-slate-50/80">
               <tr>
-                <th className="text-left px-6 py-3 font-medium text-gray-600">User</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-600">Role</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-600">Status</th>
-                <th className="text-left px-6 py-3 font-medium text-gray-600">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">User</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {members.map((member) => {
                 const isSaving = savingId === member.id
                 const isDeleting = deletingId === member.id
@@ -334,13 +337,15 @@ export default function AdminMembers() {
                 const nextStatus: UserStatus = member.status === 'disabled' ? 'active' : 'disabled'
 
                 return (
-                  <tr key={member.id} className="hover:bg-gray-50">
+                  <tr key={member.id} className="border-t border-slate-100/80 transition-colors hover:bg-slate-50/80">
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-gray-400" />
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                          <Shield className="h-4 w-4" />
+                        </div>
                         <div>
-                          <p className="font-medium text-gray-900">{member.username}</p>
-                          <p className="text-xs text-gray-500">{member.email}</p>
+                          <p className="font-medium text-slate-900">{member.username}</p>
+                          <p className="text-xs text-slate-500">{member.email}</p>
                         </div>
                       </div>
                     </td>
@@ -352,7 +357,7 @@ export default function AdminMembers() {
                           const role = e.target.value as UserRole
                           void updateMember(member.id, { role })
                         }}
-                        className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 disabled:opacity-60"
                       >
                         {ROLE_OPTIONS.map((role) => (
                           <option key={role} value={role}>
@@ -363,10 +368,10 @@ export default function AdminMembers() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE_CLASS[member.status]}`}>
+                        <span className={STATUS_BADGE_CLASS[member.status]}>
                           {STATUS_LABELS[member.status]}
                         </span>
-                        <label className="inline-flex items-center gap-2 text-xs text-gray-600">
+                        <label className="inline-flex items-center gap-2 text-xs text-slate-600">
                           <input
                             type="checkbox"
                             checked={member.ssoEnabled}
@@ -387,7 +392,7 @@ export default function AdminMembers() {
                             void updateMember(member.id, { status: nextStatus })
                           }}
                           disabled={!canToggleStatus}
-                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {member.status === 'invited'
                             ? 'Pending Invite'
@@ -401,7 +406,7 @@ export default function AdminMembers() {
                             void deleteMember(member)
                           }}
                           disabled={!canDelete}
-                          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isDeleting ? 'Removing...' : 'Remove'}
                         </button>
@@ -426,53 +431,53 @@ export default function AdminMembers() {
       )}
 
       <div className="mt-8" hidden={activeTab !== 'invitations'}>
-        <h2 className="text-lg font-semibold text-gray-900">Invited Users</h2>
-        <p className="text-sm text-gray-500 mt-1">Pending invitations, token refresh, and removal.</p>
+        <h2 className="text-lg font-semibold tracking-tight text-slate-900">Invited Users</h2>
+        <p className="mt-1 text-sm text-slate-500">Pending invitations, token refresh, and removal.</p>
 
         {inviteActionError && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
             {inviteActionError}
           </div>
         )}
 
         {invitationsError && !invitationsLoading && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
             Failed to load invitations.
           </div>
         )}
 
         {invitationsLoading && invitations.length === 0 && (
-          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-500">
+          <div className="admin-surface mt-4 p-8 text-center text-sm text-slate-500">
             Loading invitations...
           </div>
         )}
 
         {!invitationsLoading && !invitationsError && invitations.length === 0 && (
-          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-500">
+          <div className="admin-surface mt-4 p-8 text-center text-sm text-slate-500">
             No pending invitations.
           </div>
         )}
 
         {invitations.length > 0 && (
-          <div className="mt-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="admin-surface mt-4">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-slate-50/80">
                 <tr>
-                  <th className="text-left px-6 py-3 font-medium text-gray-600">Email</th>
-                  <th className="text-left px-6 py-3 font-medium text-gray-600">Role</th>
-                  <th className="text-left px-6 py-3 font-medium text-gray-600">Expires</th>
-                  <th className="text-left px-6 py-3 font-medium text-gray-600">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Expires</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody>
                 {invitations.map((invitation) => {
                   const isActing = inviteActionId === invitation.id
                   return (
-                    <tr key={invitation.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-gray-900">{invitation.email}</td>
-                      <td className="px-6 py-4 text-gray-700">{invitation.role}</td>
+                    <tr key={invitation.id} className="border-t border-slate-100/80 transition-colors hover:bg-slate-50/80">
+                      <td className="px-6 py-4 font-medium text-slate-900">{invitation.email}</td>
+                      <td className="px-6 py-4 text-slate-700">{invitation.role}</td>
                       <td className="px-6 py-4">
-                        <span className={invitation.isExpired ? 'text-red-600 text-xs' : 'text-gray-600 text-xs'}>
+                        <span className={invitation.isExpired ? 'text-xs font-medium text-red-600' : 'text-xs text-slate-600'}>
                           {new Date(invitation.expiresAt).toLocaleString()}
                         </span>
                       </td>
@@ -484,7 +489,7 @@ export default function AdminMembers() {
                               void refreshInvitationToken(invitation)
                             }}
                             disabled={isActing}
-                            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:opacity-50"
                           >
                             Refresh Token
                           </button>
@@ -494,7 +499,7 @@ export default function AdminMembers() {
                               void removeInvitation(invitation.id)
                             }}
                             disabled={isActing}
-                            className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 shadow-sm transition-colors hover:bg-red-50 disabled:opacity-50"
                           >
                             Remove
                           </button>
@@ -520,29 +525,16 @@ export default function AdminMembers() {
       </div>
 
       {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">Invite User</h2>
-              <button
-                type="button"
-                onClick={() => setShowInviteModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Close invite modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleInvite} className="space-y-4 px-6 py-5">
+        <Modal title="Invite User" onClose={() => setShowInviteModal(false)} size="lg">
+          <form onSubmit={handleInvite} className="space-y-5">
               {inviteError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
                   {inviteError}
                 </div>
               )}
 
               <div>
-                <label htmlFor="inviteEmail" className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                <label htmlFor="inviteEmail" className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
                 <input
                   id="inviteEmail"
                   type="email"
@@ -550,19 +542,19 @@ export default function AdminMembers() {
                   onChange={(e) => setInviteEmail(e.target.value)}
                   required
                   disabled={inviting}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                  className="admin-input"
                   placeholder="user@company.com"
                 />
               </div>
 
               <div>
-                <label htmlFor="inviteRole" className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+                <label htmlFor="inviteRole" className="mb-1.5 block text-sm font-medium text-slate-700">Role</label>
                 <select
                   id="inviteRole"
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as Extract<UserRole, 'operator'>)}
                   disabled={inviting}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                  className="admin-input"
                 >
                   {INVITE_ROLE_OPTIONS.map((role) => (
                     <option key={role} value={role}>
@@ -576,35 +568,34 @@ export default function AdminMembers() {
                 <button
                   type="submit"
                   disabled={inviting}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="admin-btn-primary"
                 >
                   {inviting ? 'Inviting...' : 'Invite'}
                 </button>
               </div>
 
               {activationLink && (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className="mb-2 text-sm font-medium text-gray-700">Activation Link</p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm">
+                  <p className="mb-3 text-sm font-medium text-slate-700">Activation Link</p>
                   <div className="flex gap-2">
                     <input
                       value={activationLink}
                       readOnly
-                      className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-2 text-xs text-gray-700"
+                      className="admin-input text-xs"
                     />
                     <button
                       type="button"
                       onClick={() => void handleCopyActivationLink()}
-                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                      className="admin-btn-secondary whitespace-nowrap"
                     >
                       Copy
                     </button>
                   </div>
-                  {copySuccess && <p className="mt-2 text-xs text-gray-600">{copySuccess}</p>}
+                  {copySuccess && <p className="mt-2 text-xs text-slate-600">{copySuccess}</p>}
                 </div>
               )}
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
