@@ -12,7 +12,7 @@ export default function Footer({ centerText, showPoweredBy }: FooterProps) {
   const hasCenterText = trimmedCenterText.length > 0
 
   return (
-    <footer className="border-t" style={{ borderColor: 'var(--border)' }}>
+    <footer style={{ borderColor: 'var(--border)' }}>
       <div className="max-w-5xl mx-auto px-4 py-4">
         <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           {showPoweredBy && (
