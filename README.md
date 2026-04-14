@@ -11,7 +11,7 @@ It helps you monitor services, publish incidents, schedule maintenance, and shar
 
 ## Overview
 
-The name Statora is derived from the ideas of “state” and “awareness/orchestration”, reflecting its role as a central system that continuously understands service conditions and turns them into clear, reliable communication.
+The name Statora comes from "state" and "awareness", reflecting its role as a central system that continuously understands service conditions and turns them into clear, reliable communication.
 
 With Statora, you can:
 
@@ -22,34 +22,43 @@ With Statora, you can:
 - Manage everything from a dedicated admin area
 - Self-host the platform in your own environment
 
-## Feature Highlights
+## Features
 
 ### Public Status Experience
 - Public-facing status page for services, components, and subcomponents
 - Incident history for transparent communication over time
 - Service detail views with uptime and status context
-- Real-time updates for a more responsive status experience
+- Real-time updates via WebSocket for a more responsive status experience
+- Category-based filtering for organizing services
 
 ### Incident & Maintenance Management
 - Create, update, and resolve incidents from the admin area
+- Automatic incident creation when monitors detect outages that are not already covered by an active incident
 - Publish scheduled maintenance to prepare users in advance
+- Automatic maintenance status transitions (scheduled, in-progress, completed)
 - Keep status communication centralized and consistent
 
 ### Monitoring & Reliability
 - Built-in active monitoring for HTTP, TCP, DNS, Ping, and SSL checks
-- Warning support for SSL and domain expiry monitoring flows
+- Configurable check intervals and timeouts per monitor
+- Warning support for SSL and domain expiry monitoring
 - Worker-driven status updates tied to monitoring results
+- Automatic outage detection after 3 consecutive failures
+- Daily uptime tracking and outage history
 
 ### Administration & Access Control
 - Dedicated admin dashboard for operational management
-- Role-aware access for `admin` and `operator`
-- MFA-aware protected flows for sensitive actions
+- Role-aware access with `admin` and `operator` roles
+- User invitation system for onboarding new team members
+- MFA-aware protected flows for sensitive actions (TOTP-based)
+- SSO callback support for external authentication
 - Centralized settings for branding and platform behavior
 
 ### Realtime & Integrations
-- WebSocket-powered live refresh for key status updates
-- Webhook channel management
+- WebSocket-powered live refresh for status updates
+- Webhook channel management for external notifications
 - Subscriber management for status communication workflows
+- Public API endpoints for status data
 
 ## Screenshots
 
@@ -91,6 +100,7 @@ docker compose up --build
 - Public status page: `http://localhost:8080/`
 - Admin area: `http://localhost:8080/admin`
 - Health endpoint: `http://localhost:8080/health`
+- WebSocket: `ws://localhost:8080/ws`
 
 ### Default Bootstrap Admin
 
@@ -104,12 +114,12 @@ Change these immediately for any shared or persistent environment.
 
 ## Tech Stack
 
-- **Backend:** Go, Gin
-- **Frontend:** React, TypeScript, Vite
-- **Database:** MongoDB
-- **Cache / supporting store:** Redis
+- **Backend:** Go 1.26, Gin web framework
+- **Frontend:** React 18, TypeScript 5, Vite 5, Tailwind CSS 3
+- **Database:** MongoDB 7
+- **Supporting runtime dependency:** Redis 7
 - **Realtime:** Gorilla WebSocket
-- **Authentication:** JWT with MFA-aware access flow
+- **Authentication:** JWT (golang-jwt/v5) with MFA (pquerna/otp)
 - **Deployment:** Docker, Docker Compose
 
 ## Self-Hosted by Design
@@ -120,10 +130,10 @@ Statora is designed to give teams control over their status workflow, monitoring
 
 Planned improvements include:
 
-- stronger production hardening for realtime and CORS behavior
-- richer API and developer documentation
-- more scalable worker deployment patterns
-- broader observability support
+- Stronger production hardening for realtime and CORS behavior
+- Richer API and developer documentation
+- More scalable worker deployment patterns
+- Broader observability support
 
 ## Contributing
 
